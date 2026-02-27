@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>灵感导航站 · AI工具与数字资源</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <div class="hero__overlay"></div>
+    <div class="hero__content container">
+      <p class="eyebrow">InspireHub</p>
+      <h1>AI 与效率工具导航</h1>
+      <p class="hero__desc">精选 AI 模型、设计工具、开发资源与学习平台，帮助你快速找到高价值站点。</p>
+      <div class="search-box">
+        <input id="searchInput" type="text" placeholder="搜索工具名称、分类、关键词…" aria-label="搜索网址" />
+      </div>
+      <nav class="quick-links" id="quickLinks"></nav>
+    </div>
+  </header>
+
+  <main class="container main-layout">
+    <aside class="category-sidebar" id="categorySidebar"></aside>
+    <section class="cards-area" id="cardsArea"></section>
+  </main>
+
+  <footer class="site-footer">
+    <p>© 2026 InspireHub · 原生 JS + CSS 构建 · 内容仅供学习与个人导航整理使用</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
