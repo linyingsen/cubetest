@@ -4,16 +4,18 @@ and generate local rewritten intro pages for every imported site.
 
 Usage:
   pip install beautifulsoup4 lxml
-  python3 tools/import_aibot.py --output index.html --pages-dir sites
+  python3 tools/import_aibot.py --output index.html --pages-dir sites --icons-dir assets/icons
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
 import html
+import os
 import re
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 
 URL = "https://ai-bot.cn/"
@@ -31,11 +33,25 @@ def slugify(text: str) -> str:
     return value[:64] or "category"
 
 
+def ascii_slug(text: str, fallback_prefix: str = "site") -> str:
+    ascii_only = re.sub(r"[^a-z0-9]+", "-", (text or "").lower()).strip("-")
+    digest = hashlib.md5((text or "").encode("utf-8")).hexdigest()[:8]
+    core = ascii_only[:40] if ascii_only else fallback_prefix
+    return f"{core}-{digest}"
+
+
 def fetch_html(url: str, timeout: int = 30) -> str:
     headers = {"User-Agent": "Mozilla/5.0"}
     req = Request(url, headers=headers)
     with urlopen(req, timeout=timeout) as resp:
         return resp.read().decode("utf-8", errors="replace")
+
+
+def fetch_bytes(url: str, timeout: int = 30) -> bytes:
+    headers = {"User-Agent": "Mozilla/5.0"}
+    req = Request(url, headers=headers)
+    with urlopen(req, timeout=timeout) as resp:
+        return resp.read()
 
 
 def rewrite_intro(raw: str, title: str, category: str) -> str:
@@ -202,13 +218,47 @@ def extract_profile_summary(profile_html: str) -> str:
     return " ".join(unique[:24])
 
 
-def generate_detail_pages(imported, pages_dir: Path, timeout: int = 30):
+def infer_icon_ext(icon_url: str) -> str:
+    path = urlparse(icon_url).path.lower()
+    ext = os.path.splitext(path)[1]
+    if ext in {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".ico"}:
+        return ext
+    return ".png"
+
+
+def download_icons(imported, project_root: Path, icons_dir: Path, timeout: int = 30):
+    icons_dir.mkdir(parents=True, exist_ok=True)
+    icon_cache = {}
+
+    for idx, item in enumerate(imported, start=1):
+        icon_url = item.get("icon", "")
+        if not icon_url:
+            continue
+
+        if icon_url in icon_cache:
+            item["local_icon"] = icon_cache[icon_url]
+            continue
+
+        try:
+            content = fetch_bytes(icon_url, timeout=timeout)
+        except Exception:
+            continue
+
+        filename = f"{idx:04d}-{ascii_slug(item['title'], 'icon')}{infer_icon_ext(icon_url)}"
+        file_path = icons_dir / filename
+        file_path.write_bytes(content)
+
+        rel = file_path.relative_to(project_root).as_posix()
+        item["local_icon"] = rel
+        icon_cache[icon_url] = rel
+
+
+def generate_detail_pages(imported, project_root: Path, pages_dir: Path, timeout: int = 30):
     pages_dir.mkdir(parents=True, exist_ok=True)
     profile_cache = {}
 
     for idx, item in enumerate(imported, start=1):
-        slug = slugify(item["title"]) or f"site-{idx}"
-        filename = f"{idx:04d}-{slug}.html"
+        filename = f"{idx:04d}-{ascii_slug(item['title'])}.html"
         item["local_page"] = f"{pages_dir.name}/{filename}"
 
         profile_url = item.get("profile_url", "")
@@ -223,6 +273,11 @@ def generate_detail_pages(imported, pages_dir: Path, timeout: int = 30):
                 profile_summary = extract_profile_summary(profile_cache[profile_url])
 
         rewritten = rewrite_intro(profile_summary or item.get("desc", ""), item["title"], item["category"])
+
+        icon_rel = item.get("local_icon", "")
+        detail_icon = ""
+        if icon_rel:
+            detail_icon = Path("..") / Path(icon_rel)
 
         page = f"""<!DOCTYPE html>
 <html lang=\"zh-CN\">
@@ -241,13 +296,13 @@ def generate_detail_pages(imported, pages_dir: Path, timeout: int = 30):
     .btns a {{ text-decoration:none; display:inline-block; margin-right:10px; padding:8px 12px; border-radius:10px; }}
     .btn-primary {{ background:#0f9d90; color:#fff; }}
     .btn-ghost {{ background:#ecf7f5; color:#0a7f74; }}
-    .desc {{ line-height:1.85; white-space:normal; }}
+    .desc {{ line-height:1.85; }}
   </style>
 </head>
 <body>
   <main class=\"wrap\">
     <article class=\"card\">
-      <div class=\"head\">{f'<img src="{html.escape(item.get("icon", ""))}" alt="图标" />' if item.get('icon') else ''}<h1>{html.escape(item['title'])}</h1></div>
+      <div class=\"head\">{f'<img src="{html.escape(detail_icon.as_posix())}" alt="图标" />' if detail_icon else ''}<h1>{html.escape(item['title'])}</h1></div>
       <p class=\"meta\">分类：{html.escape(item['category'])}</p>
       <p class=\"desc\">{html.escape(rewritten)}</p>
       <div class=\"btns\">
@@ -297,10 +352,10 @@ def render(imported):
 
         for item in items:
             kws = html.escape(item["category"])
-            icon = html.escape(item.get("icon", ""))
+            icon_rel = html.escape(item.get("local_icon", ""))
             icon_html = (
-                f'<img class="site-icon" src="{icon}" alt="{html.escape(item["title"])} 图标" loading="lazy" />'
-                if icon
+                f'<img class="site-icon" src="{icon_rel}" alt="{html.escape(item["title"])} 图标" loading="lazy" />'
+                if icon_rel
                 else '<span class="site-icon site-icon--placeholder" aria-hidden="true"></span>'
             )
             local_page = html.escape(item.get("local_page", "#"))
@@ -323,23 +378,26 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", default="index.html")
     parser.add_argument("--pages-dir", default="sites")
+    parser.add_argument("--icons-dir", default="assets/icons")
     parser.add_argument("--timeout", default=30, type=int)
     args = parser.parse_args()
 
     html_path = Path(args.output)
+    project_root = html_path.parent
     text = html_path.read_text(encoding="utf-8")
     if START not in text or END not in text:
         raise RuntimeError(f"index.html must include markers: {START} ... {END}")
 
     imported = scrape(timeout=args.timeout)
-    pages_dir = html_path.parent / args.pages_dir
-    generate_detail_pages(imported, pages_dir=pages_dir, timeout=args.timeout)
+    download_icons(imported, project_root=project_root, icons_dir=project_root / args.icons_dir, timeout=args.timeout)
+    generate_detail_pages(imported, project_root=project_root, pages_dir=project_root / args.pages_dir, timeout=args.timeout)
 
     block = render(imported)
     new_text = re.sub(f"{re.escape(START)}[\\s\\S]*?{re.escape(END)}", f"{START}\n{block}\n{END}", text)
     html_path.write_text(new_text, encoding="utf-8")
     print(f"Imported {len(imported)} links into {html_path}")
-    print(f"Generated local intro pages under: {pages_dir}")
+    print(f"Generated local intro pages under: {project_root / args.pages_dir}")
+    print(f"Downloaded local icons under: {project_root / args.icons_dir}")
 
 
 if __name__ == "__main__":
