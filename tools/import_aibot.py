@@ -63,8 +63,21 @@ def scrape(timeout: int = 30):
             title = clean(card.select_one("strong").get_text(" ")) if card.select_one("strong") else ""
             desc = clean(card.select_one("p").get_text(" ")) if card.select_one("p") else ""
             url = card.get("data-url") or card.get("href")
+            icon_el = card.select_one(".url-img img")
+            icon = ""
+            if icon_el:
+                icon = icon_el.get("data-src") or icon_el.get("src") or ""
+
             if title and url:
-                links.append({"category": category_name, "title": title, "url": url, "desc": desc})
+                links.append(
+                    {
+                        "category": category_name,
+                        "title": title,
+                        "url": url,
+                        "desc": desc,
+                        "icon": icon,
+                    }
+                )
         return links
 
     i = 0
@@ -140,10 +153,16 @@ def render(imported):
 
         for item in items:
             kws = html.escape(item["category"])
+            icon = html.escape(item.get("icon", ""))
+            icon_html = (
+                f'<img class="site-icon" src="{icon}" alt="{html.escape(item["title"])} 图标" loading="lazy" />'
+                if icon
+                else '<span class="site-icon site-icon--placeholder" aria-hidden="true"></span>'
+            )
             out.append(
                 "    <a class=\"site-card\" target=\"_blank\" rel=\"noopener noreferrer\""
                 f" href=\"{html.escape(item['url'])}\" data-keywords=\"{kws}\">"
-                f"<h3 class=\"site-title\">{html.escape(item['title'])}</h3>"
+                f"<div class=\"site-card__top\">{icon_html}<h3 class=\"site-title\">{html.escape(item['title'])}</h3></div>"
                 f"<p class=\"site-desc\">{html.escape(item['desc'])}</p>"
                 f"<span class=\"site-meta\">{html.escape(item['category'])}</span></a>"
             )

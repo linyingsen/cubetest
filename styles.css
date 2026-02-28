@@ -195,6 +195,28 @@ body {
   box-shadow: 0 10px 18px rgba(15, 157, 144, 0.14);
 }
 
+
+.site-card__top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.site-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex: 0 0 24px;
+  border: 1px solid #d8e4ef;
+  background: #fff;
+}
+
+.site-icon--placeholder {
+  display: inline-block;
+  background: linear-gradient(145deg, #dbe8f2, #f2f7fb);
+}
+
 .site-title {
   margin: 0;
   font-size: 16px;
