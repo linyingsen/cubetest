@@ -23,8 +23,13 @@ def clean(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "").strip())
 
 
+def slugify(text: str) -> str:
+    value = re.sub(r"[^\w\u4e00-\u9fa5]+", "-", (text or "").strip().lower())
+    value = re.sub(r"-+", "-", value).strip("-")
+    return value[:64] or "category"
+
+
 def fetch_html(timeout: int = 30) -> str:
-    """Download homepage HTML using stdlib only (no requests dependency)."""
     headers = {"User-Agent": "Mozilla/5.0"}
     req = Request(URL, headers=headers)
     with urlopen(req, timeout=timeout) as resp:
@@ -45,7 +50,6 @@ def scrape(timeout: int = 30):
         raise RuntimeError(f"Failed to download {URL}: {exc}") from exc
 
     soup = BeautifulSoup(html_text, "lxml")
-
     content_layout = soup.select_one(".content-layout")
     if not content_layout:
         raise RuntimeError("Unable to find .content-layout on ai-bot homepage")
@@ -102,24 +106,50 @@ def scrape(timeout: int = 30):
 
 
 def render(imported):
+    grouped = {}
+    order = []
+    for item in imported:
+        cat = item["category"]
+        if cat not in grouped:
+            grouped[cat] = []
+            order.append(cat)
+        grouped[cat].append(item)
+
     out = [
-        '<section class="category-block" id="aibot-full" data-category="AI-BOT首页全量导入">',
-        '  <div class="category-head"><h2>AI-BOT 首页链接导入</h2><span class="category-tag">自动同步</span></div>',
-        '  <div class="card-grid">',
+        '<section class="category-block" id="aibot-overview" data-category="AI-BOT 抓取分类">',
+        '  <div class="category-head"><h2>AI-BOT 抓取分类总览</h2><span class="category-tag">自动同步</span></div>',
+        '  <div class="quick-links">',
     ]
 
-    for item in imported:
-        kws = html.escape(item["category"])
-        out.append(
-            "    <a class=\"site-card\" target=\"_blank\" rel=\"noopener noreferrer\""
-            f" href=\"{html.escape(item['url'])}\" data-keywords=\"{kws}\">"
-            f"<h3 class=\"site-title\">{html.escape(item['title'])}</h3>"
-            f"<p class=\"site-desc\">{html.escape(item['desc'])}</p>"
-            f"<span class=\"site-meta\">{html.escape(item['category'])}</span></a>"
+    for cat in order:
+        cid = f"aibot-{slugify(cat)}"
+        out.append(f'    <a href="#{cid}">{html.escape(cat)}</a>')
+
+    out.extend(["  </div>", "</section>"])
+
+    for cat in order:
+        cid = f"aibot-{slugify(cat)}"
+        items = grouped[cat]
+        out.extend(
+            [
+                f'<section class="category-block" id="{cid}" data-category="{html.escape(cat)}">',
+                f'  <div class="category-head"><h2>{html.escape(cat)}</h2><span class="category-tag">{len(items)} 个</span></div>',
+                '  <div class="card-grid">',
+            ]
         )
 
-    out.append("  </div>")
-    out.append("</section>")
+        for item in items:
+            kws = html.escape(item["category"])
+            out.append(
+                "    <a class=\"site-card\" target=\"_blank\" rel=\"noopener noreferrer\""
+                f" href=\"{html.escape(item['url'])}\" data-keywords=\"{kws}\">"
+                f"<h3 class=\"site-title\">{html.escape(item['title'])}</h3>"
+                f"<p class=\"site-desc\">{html.escape(item['desc'])}</p>"
+                f"<span class=\"site-meta\">{html.escape(item['category'])}</span></a>"
+            )
+
+        out.extend(["  </div>", "</section>"])
+
     return "\n".join(out)
 
 

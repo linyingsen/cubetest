@@ -1,24 +1,45 @@
 const searchInput = document.getElementById("searchInput");
 const quickLinks = document.getElementById("quickLinks");
 const categorySidebar = document.getElementById("categorySidebar");
-const categoryBlocks = Array.from(document.querySelectorAll(".category-block"));
 const emptyState = document.getElementById("emptyState");
 
 function normalize(text) {
   return (text || "").toLowerCase().trim();
 }
 
+function getCategoryBlocks() {
+  return Array.from(document.querySelectorAll(".category-block"));
+}
+
+function slugify(text) {
+  return (text || "")
+    .toLowerCase()
+    .replace(/[^\w\u4e00-\u9fa5]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+}
+
+function ensureBlockIds() {
+  getCategoryBlocks().forEach((block, index) => {
+    if (!block.id) {
+      const label = block.dataset.category || block.querySelector("h2")?.textContent || `category-${index + 1}`;
+      block.id = `cat-${slugify(label)}-${index + 1}`;
+    }
+  });
+}
+
 function applyFilter(keyword = "") {
   const q = normalize(keyword);
   let totalVisibleCards = 0;
 
-  categoryBlocks.forEach((block) => {
+  getCategoryBlocks().forEach((block) => {
     const cards = Array.from(block.querySelectorAll(".site-card"));
     let categoryVisible = 0;
 
     cards.forEach((card) => {
       const searchable = [
         block.dataset.category,
+        block.querySelector("h2")?.textContent,
         card.querySelector(".site-title")?.textContent,
         card.querySelector(".site-desc")?.textContent,
         card.querySelector(".site-meta")?.textContent,
@@ -50,15 +71,23 @@ function bindQuickLinks() {
   });
 }
 
-function bindSidebarScroll() {
-  const buttons = Array.from(categorySidebar.querySelectorAll("button[data-target]"));
+function renderSidebar() {
+  categorySidebar.innerHTML = "";
 
-  buttons.forEach((button) => {
-    button.addEventListener("click", () => {
-      const id = button.dataset.target;
-      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-      buttons.forEach((btn) => btn.classList.toggle("active", btn === button));
+  getCategoryBlocks().forEach((block, index) => {
+    const title = block.dataset.category || block.querySelector("h2")?.textContent || `分类${index + 1}`;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.dataset.target = block.id;
+    btn.textContent = title;
+    if (index === 0) btn.classList.add("active");
+
+    btn.addEventListener("click", () => {
+      document.getElementById(block.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      categorySidebar.querySelectorAll("button").forEach((item) => item.classList.toggle("active", item === btn));
     });
+
+    categorySidebar.appendChild(btn);
   });
 }
 
@@ -66,6 +95,7 @@ searchInput.addEventListener("input", (event) => {
   applyFilter(event.target.value);
 });
 
+ensureBlockIds();
 bindQuickLinks();
-bindSidebarScroll();
+renderSidebar();
 applyFilter();
