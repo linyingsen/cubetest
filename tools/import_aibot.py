@@ -3,7 +3,6 @@
 
 Usage:
   pip install beautifulsoup4 lxml
-  # requests is optional now
   python3 tools/import_aibot.py --output index.html
 """
 from __future__ import annotations
@@ -25,22 +24,11 @@ def clean(text: str) -> str:
 
 
 def fetch_html(timeout: int = 30) -> str:
+    """Download homepage HTML using stdlib only (no requests dependency)."""
     headers = {"User-Agent": "Mozilla/5.0"}
-    try:
-        import requests  # optional dependency
-
-        resp = requests.get(URL, timeout=timeout, headers=headers)
-        resp.raise_for_status()
-        return resp.text
-    except ModuleNotFoundError:
-        req = Request(URL, headers=headers)
-        with urlopen(req, timeout=timeout) as resp:
-            return resp.read().decode("utf-8", errors="replace")
-    except Exception:
-        # If requests exists but fails unexpectedly, fallback to stdlib fetch.
-        req = Request(URL, headers=headers)
-        with urlopen(req, timeout=timeout) as resp:
-            return resp.read().decode("utf-8", errors="replace")
+    req = Request(URL, headers=headers)
+    with urlopen(req, timeout=timeout) as resp:
+        return resp.read().decode("utf-8", errors="replace")
 
 
 def scrape(timeout: int = 30):
