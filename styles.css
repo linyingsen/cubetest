@@ -235,6 +235,33 @@ body {
   color: var(--brand-strong);
 }
 
+
+.site-card--rich {
+  align-content: start;
+}
+
+.site-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.site-link {
+  text-decoration: none;
+  font-size: 12px;
+  color: #fff;
+  background: var(--brand-strong);
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+
+.site-link--ghost {
+  background: #e6f3f1;
+  color: var(--brand-strong);
+}
+
+
 .empty-state {
   background: #fff;
   border: 1px dashed #bed2e4;
