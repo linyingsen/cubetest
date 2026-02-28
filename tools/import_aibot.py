@@ -2,7 +2,8 @@
 """Fetch ai-bot.cn homepage categories/links and inject static cards into index.html.
 
 Usage:
-  pip install requests beautifulsoup4 lxml
+  pip install beautifulsoup4 lxml
+  # requests is optional now
   python3 tools/import_aibot.py --output index.html
 """
 from __future__ import annotations
@@ -11,7 +12,8 @@ import argparse
 import html
 import re
 from pathlib import Path
-
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 URL = "https://ai-bot.cn/"
 START = "<!-- AI_BOT_IMPORT_START -->"
@@ -22,13 +24,39 @@ def clean(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "").strip())
 
 
-def scrape(timeout: int = 30):
-    import requests
-    from bs4 import BeautifulSoup
+def fetch_html(timeout: int = 30) -> str:
+    headers = {"User-Agent": "Mozilla/5.0"}
+    try:
+        import requests  # optional dependency
 
-    resp = requests.get(URL, timeout=timeout, headers={"User-Agent": "Mozilla/5.0"})
-    resp.raise_for_status()
-    soup = BeautifulSoup(resp.text, "lxml")
+        resp = requests.get(URL, timeout=timeout, headers=headers)
+        resp.raise_for_status()
+        return resp.text
+    except ModuleNotFoundError:
+        req = Request(URL, headers=headers)
+        with urlopen(req, timeout=timeout) as resp:
+            return resp.read().decode("utf-8", errors="replace")
+    except Exception:
+        # If requests exists but fails unexpectedly, fallback to stdlib fetch.
+        req = Request(URL, headers=headers)
+        with urlopen(req, timeout=timeout) as resp:
+            return resp.read().decode("utf-8", errors="replace")
+
+
+def scrape(timeout: int = 30):
+    try:
+        from bs4 import BeautifulSoup
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "Missing dependency: beautifulsoup4. Install with: pip install beautifulsoup4 lxml"
+        ) from exc
+
+    try:
+        html_text = fetch_html(timeout=timeout)
+    except (HTTPError, URLError, TimeoutError) as exc:
+        raise RuntimeError(f"Failed to download {URL}: {exc}") from exc
+
+    soup = BeautifulSoup(html_text, "lxml")
 
     content_layout = soup.select_one(".content-layout")
     if not content_layout:
@@ -67,7 +95,12 @@ def scrape(timeout: int = 30):
                 if cur.name == "h4" and {"text-gray", "text-lg"}.issubset(cur_cls):
                     tab_wrap = children[i + 1] if i + 1 < len(children) else None
                     tab_content = children[i + 2] if i + 2 < len(children) else None
-                    if tab_wrap and tab_content and tab_content.name == "div" and {"tab-content", "mt-4"}.issubset(set(tab_content.get("class", []))):
+                    if (
+                        tab_wrap
+                        and tab_content
+                        and tab_content.name == "div"
+                        and {"tab-content", "mt-4"}.issubset(set(tab_content.get("class", [])))
+                    ):
                         for tab in tab_wrap.select(".slider_menu a[href^='#']"):
                             sub = clean(tab.get_text(" "))
                             pane = tab_content.select_one(tab.get("href"))
@@ -81,9 +114,11 @@ def scrape(timeout: int = 30):
 
 
 def render(imported):
-    out = ["<section class=\"category-block\" id=\"aibot-full\" data-category=\"AI-BOT首页全量导入\">",
-           "  <div class=\"category-head\"><h2>AI-BOT 首页链接导入</h2><span class=\"category-tag\">自动同步</span></div>",
-           "  <div class=\"card-grid\">"]
+    out = [
+        '<section class="category-block" id="aibot-full" data-category="AI-BOT首页全量导入">',
+        '  <div class="category-head"><h2>AI-BOT 首页链接导入</h2><span class="category-tag">自动同步</span></div>',
+        '  <div class="card-grid">',
+    ]
 
     for item in imported:
         kws = html.escape(item["category"])
