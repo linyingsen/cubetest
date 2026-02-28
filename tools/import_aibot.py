@@ -43,7 +43,6 @@ def rewrite_intro(raw: str, title: str, category: str) -> str:
     if not source:
         source = f"{title} 是一个与 {category} 相关的在线工具，覆盖常见创作与效率场景。"
 
-    # Light rewrite rules to avoid direct copy and keep meaning.
     replacements = {
         "提供": "支持",
         "帮助": "用于帮助",
@@ -53,18 +52,36 @@ def rewrite_intro(raw: str, title: str, category: str) -> str:
         "一键": "便捷",
         "功能": "能力",
         "工具": "方案",
+        "适合": "更适用于",
     }
-    rewritten = source
-    for old, new in replacements.items():
-        rewritten = rewritten.replace(old, new)
 
-    if not rewritten.endswith("。"):
-        rewritten += "。"
+    normalized = re.sub(r"[\n\r]+", "。", source)
+    normalized = re.sub(r"[；;]+", "。", normalized)
+    sentences = [clean(x) for x in re.split(r"[。！？!?]", normalized) if clean(x)]
+
+    rewritten_sentences = []
+    for idx, sentence in enumerate(sentences):
+        line = sentence
+        for old, new in replacements.items():
+            line = line.replace(old, new)
+
+        prefix = ["在实际使用中，", "从能力结构看，", "结合应用场景来看，"][idx % 3]
+        line = f"{prefix}{line}"
+        if not line.endswith("。"):
+            line += "。"
+        rewritten_sentences.append(line)
+
+    merged = "".join(rewritten_sentences)
+    if len(merged) < max(160, int(len(source) * 0.9)):
+        merged += (
+            "此外，它通常覆盖从信息输入、内容处理到结果输出的完整链路，"
+            "对需要持续产出、强调效率与质量并重的个人或团队更友好。"
+        )
 
     return (
-        f"{title}（分类：{category}）可用于对应业务场景，以下为整理后的简介："
-        f"{rewritten}"
-        " 结合目录体验来看，它更适合希望缩短操作路径、快速完成任务的用户。"
+        f"{title}（分类：{category}）的能力说明（改写版）如下："
+        f"{merged}"
+        "以上内容基于原站点资料进行结构化改写与整理，尽量保留关键信息密度。"
     )
 
 
@@ -157,16 +174,32 @@ def extract_profile_summary(profile_html: str) -> str:
     from bs4 import BeautifulSoup
 
     soup = BeautifulSoup(profile_html, "lxml")
-    meta_desc = soup.select_one('meta[name="description"]')
-    if meta_desc and meta_desc.get("content"):
-        return clean(meta_desc.get("content"))
+    parts = []
 
-    og_desc = soup.select_one('meta[property="og:description"]')
-    if og_desc and og_desc.get("content"):
-        return clean(og_desc.get("content"))
+    for selector in ['meta[name="description"]', 'meta[property="og:description"]']:
+        node = soup.select_one(selector)
+        if node and node.get("content"):
+            parts.append(clean(node.get("content")))
 
-    candidate = soup.select_one(".site-content p, .panel-body p, article p")
-    return clean(candidate.get_text(" ")) if candidate else ""
+    for p in soup.select(".site-content p, .panel-body p, article p, .entry-content p"):
+        text = clean(p.get_text(" "))
+        if text and len(text) >= 18:
+            parts.append(text)
+
+    for li in soup.select(".site-content li, .panel-body li, article li, .entry-content li"):
+        text = clean(li.get_text(" "))
+        if text and len(text) >= 12:
+            parts.append(f"- {text}")
+
+    unique = []
+    seen = set()
+    for part in parts:
+        key = part[:120]
+        if key not in seen:
+            seen.add(key)
+            unique.append(part)
+
+    return " ".join(unique[:24])
 
 
 def generate_detail_pages(imported, pages_dir: Path, timeout: int = 30):
@@ -200,15 +233,15 @@ def generate_detail_pages(imported, pages_dir: Path, timeout: int = 30):
   <meta name=\"description\" content={html.escape(rewritten)!r} />
   <style>
     body {{ margin: 0; font-family: 'PingFang SC','Microsoft YaHei',sans-serif; background:#f4f8fb; color:#163a56; }}
-    .wrap {{ width:min(860px, calc(100% - 32px)); margin:32px auto; }}
-    .card {{ background:#fff; border:1px solid #d8e4ef; border-radius:14px; padding:22px; box-shadow:0 10px 24px rgba(20,57,87,.08); }}
+    .wrap {{ width:min(900px, calc(100% - 32px)); margin:32px auto; }}
+    .card {{ background:#fff; border:1px solid #d8e4ef; border-radius:14px; padding:24px; box-shadow:0 10px 24px rgba(20,57,87,.08); }}
     .head {{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }}
     .head img {{ width:30px; height:30px; border-radius:8px; border:1px solid #d8e4ef; }}
     .meta {{ font-size:13px; color:#5e7b94; margin:6px 0 18px; }}
     .btns a {{ text-decoration:none; display:inline-block; margin-right:10px; padding:8px 12px; border-radius:10px; }}
     .btn-primary {{ background:#0f9d90; color:#fff; }}
     .btn-ghost {{ background:#ecf7f5; color:#0a7f74; }}
-    .desc {{ line-height:1.8; }}
+    .desc {{ line-height:1.85; white-space:normal; }}
   </style>
 </head>
 <body>
