@@ -230,7 +230,6 @@ def generate_detail_and_articles(imported, project_root: Path, pages_dir: Path, 
                 except Exception:
                     profile_cache[profile_url] = ""
             if profile_cache[profile_url]:
-                # User explicitly requested full copy style.
                 profile_full = extract_profile_full(profile_cache[profile_url])
 
         intro = profile_full or item.get("desc") or f"{item['title']} 是一个面向 {item['category']} 的 AI 服务。"
@@ -244,17 +243,55 @@ def generate_detail_and_articles(imported, project_root: Path, pages_dir: Path, 
             list_rel = f"../articles/{list_name}"
             articles = build_article_items(item["title"], item["category"], intro, kind)
 
-            # list page
-            list_cards = []
+            list_rows = []
             for idx, art in enumerate(articles, 1):
                 detail_file = f"{slug}-{kind}-{idx}.html"
-                list_cards.append(
-                    f'<li><a href="{html.escape(detail_file)}">{html.escape(art["title"])}</a><p>{html.escape(art["excerpt"])}</p></li>'
+                list_rows.append(
+                    f'<article class="news-item"><h2><a href="{html.escape(detail_file)}">{html.escape(art["title"])}</a></h2><p>{html.escape(art["excerpt"])}</p><div class="meta">来源：InspireHub · 分类：{cn}</div></article>'
                 )
-                detail_html = f"""<!doctype html><html lang=\"zh-CN\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>{html.escape(art['title'])}</title><style>body{{font-family:PingFang SC,Microsoft YaHei,sans-serif;background:#f5f8fb;margin:0}}main{{max-width:860px;margin:28px auto;padding:0 16px}}article{{background:#fff;border:1px solid #d8e4ef;border-radius:12px;padding:22px}}a{{color:#0a7f74;text-decoration:none}}</style></head><body><main><article><h1>{html.escape(art['title'])}</h1><p>{html.escape(art['body'])}</p><p><a href=\"{html.escape(list_name)}\">返回列表</a></p></article></main></body></html>"""
+
+                detail_html = f"""<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(art['title'])}</title>
+<style>
+:root{{--bg:#f2f5f9;--surface:#fff;--ink:#1b3550;--muted:#5d748a;--brand:#c2181e;--line:#d9e2ec}}
+body{{margin:0;background:var(--bg);font-family:PingFang SC,Microsoft YaHei,sans-serif;color:var(--ink)}}
+.top{{background:#fff;border-bottom:1px solid var(--line)}} .top .inner{{max-width:1180px;margin:0 auto;padding:14px 16px;display:flex;justify-content:space-between;align-items:center}}
+.logo{{font-weight:700}} .crumb{{color:var(--muted);font-size:13px}}
+.wrap{{max-width:1180px;margin:20px auto;padding:0 16px;display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px}}
+.main{{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:26px}}
+.main h1{{font-size:32px;line-height:1.3;margin:0 0 10px}} .meta{{font-size:13px;color:var(--muted);border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:18px}}
+.main p{{line-height:1.95;font-size:17px}}
+.ad{{background:linear-gradient(120deg,#eef4fb,#f8fbff);border:1px dashed #b9ccde;border-radius:10px;padding:14px;text-align:center;color:#6b85a0;font-size:13px}}
+.side{{display:grid;gap:14px}} .panel{{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px}}
+.panel h3{{margin:0 0 10px;font-size:16px}} .panel li{{margin:0 0 8px}} a{{color:#16507c;text-decoration:none}}
+@media(max-width:980px){{.wrap{{grid-template-columns:1fr}}}}
+</style></head><body>
+<header class="top"><div class="inner"><div class="logo">InspireHub 资讯</div><div class="crumb">{html.escape(item['title'])} / {cn}</div></div></header>
+<main class="wrap"><article class="main"><h1>{html.escape(art['title'])}</h1><div class="meta">发布时间：2026-03-01 · 作者：编辑部 · 分类：{cn}</div><div class="ad">广告位 A（文章顶部横幅）</div><p>{html.escape(art['body'])}</p><p>{html.escape(art['body'])}</p><div class="ad">广告位 B（正文中插）</div><p><a href="{html.escape(list_name)}">返回栏目列表</a></p></article>
+<aside class="side"><section class="panel"><h3>推荐阅读</h3><ul><li><a href="{html.escape(list_name)}">{html.escape(item['title'])}{cn}列表</a></li><li><a href="../{html.escape(item['local_page'])}">返回AI介绍页</a></li></ul></section><div class="ad">广告位 C（右侧矩形）</div></aside></main></body></html>"""
                 (article_root / detail_file).write_text(detail_html, encoding="utf-8")
 
-            list_html = f"""<!doctype html><html lang=\"zh-CN\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>{html.escape(item['title'])} - {cn}</title><style>body{{font-family:PingFang SC,Microsoft YaHei,sans-serif;background:#f5f8fb;margin:0}}main{{max-width:920px;margin:28px auto;padding:0 16px}}section{{background:#fff;border:1px solid #d8e4ef;border-radius:12px;padding:22px}}li{{margin:0 0 14px}}a{{color:#0a7f74;text-decoration:none}}p{{color:#5e7b94}}</style></head><body><main><section><h1>{html.escape(item['title'])} · {cn}</h1><ul>{''.join(list_cards)}</ul><p><a href=\"../{html.escape(item['local_page'])}\">返回介绍页</a></p></section></main></body></html>"""
+            list_html = f"""<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(item['title'])} - {cn}</title>
+<style>
+:root{{--bg:#f2f5f9;--surface:#fff;--ink:#1b3550;--muted:#5d748a;--line:#d9e2ec;--accent:#c2181e}}
+body{{margin:0;background:var(--bg);font-family:PingFang SC,Microsoft YaHei,sans-serif;color:var(--ink)}}
+.top{{background:#fff;border-bottom:1px solid var(--line)}} .top .inner{{max-width:1180px;margin:0 auto;padding:14px 16px;display:flex;justify-content:space-between;align-items:center}}
+.logo{{font-weight:700}} .nav{{font-size:13px;color:var(--muted)}}
+.wrap{{max-width:1180px;margin:20px auto;padding:0 16px;display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px}}
+.main{{background:#fff;border:1px solid var(--line);border-radius:10px;padding:18px}}
+.main h1{{margin:4px 0 14px;font-size:28px;border-left:4px solid var(--accent);padding-left:10px}}
+.news-item{{padding:16px 4px;border-bottom:1px solid #e7eef5}} .news-item:last-child{{border-bottom:0}}
+.news-item h2{{font-size:22px;margin:0 0 8px;line-height:1.35}} .news-item p{{margin:0 0 10px;color:var(--muted);line-height:1.75}}
+.meta{{font-size:12px;color:#7b91a7}}
+.side{{display:grid;gap:14px}} .panel{{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px}}
+.panel h3{{margin:0 0 10px;font-size:16px}} .panel li{{margin:0 0 8px}} a{{color:#16507c;text-decoration:none}}
+.ad{{background:linear-gradient(120deg,#eef4fb,#f8fbff);border:1px dashed #b9ccde;border-radius:10px;padding:14px;text-align:center;color:#6b85a0;font-size:13px}}
+@media(max-width:980px){{.wrap{{grid-template-columns:1fr}}}}
+</style></head><body>
+<header class="top"><div class="inner"><div class="logo">InspireHub 栏目</div><div class="nav">{html.escape(item['title'])} / {cn}</div></div></header>
+<main class="wrap"><section class="main"><h1>{html.escape(item['title'])} · {cn}</h1><div class="ad">广告位 A（列表顶部横幅）</div>{''.join(list_rows)}<p><a href="../{html.escape(item['local_page'])}">返回介绍页</a></p></section>
+<aside class="side"><section class="panel"><h3>栏目导航</h3><ul><li><a href="{html.escape(slug)}-news.html">新闻资讯</a></li><li><a href="{html.escape(slug)}-tips.html">使用技巧</a></li><li><a href="{html.escape(slug)}-prompts.html">提示词</a></li></ul></section><div class="ad">广告位 B（右侧矩形）</div></aside></main></body></html>"""
             (article_root / list_name).write_text(list_html, encoding="utf-8")
 
             preview = "".join(
@@ -266,26 +303,26 @@ def generate_detail_and_articles(imported, project_root: Path, pages_dir: Path, 
             )
 
         detail_html = f"""<!doctype html>
-<html lang=\"zh-CN\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">
-<title>{html.escape(item['title'])} - 介绍页</title>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(item['title'])} - 介绍页</title>
 <style>
-body{{margin:0;font-family:PingFang SC,Microsoft YaHei,sans-serif;background:#f4f8fb;color:#163a56}}
-.wrap{{max-width:980px;margin:28px auto;padding:0 16px}}
-.card{{background:#fff;border:1px solid #d8e4ef;border-radius:14px;padding:22px;box-shadow:0 10px 24px rgba(20,57,87,.08)}}
-.head{{display:flex;align-items:center;gap:10px}} .head img{{width:34px;height:34px;border-radius:8px;border:1px solid #d8e4ef}}
-.meta{{color:#5e7b94;font-size:13px;margin:8px 0 16px}} .desc{{line-height:1.85}}
-.btns a{{display:inline-block;padding:8px 12px;border-radius:10px;text-decoration:none;margin-right:8px}}
-.p{{background:#0f9d90;color:#fff}} .g{{background:#ecf7f5;color:#0a7f74}}
+:root{{--bg:#f2f5f9;--surface:#fff;--ink:#1b3550;--muted:#5d748a;--line:#d9e2ec;--accent:#c2181e}}
+body{{margin:0;background:var(--bg);font-family:PingFang SC,Microsoft YaHei,sans-serif;color:var(--ink)}}
+.top{{background:#fff;border-bottom:1px solid var(--line)}} .top .inner{{max-width:1180px;margin:0 auto;padding:14px 16px;display:flex;justify-content:space-between;align-items:center}}
+.logo{{font-weight:700}} .date{{font-size:12px;color:var(--muted)}}
+.wrap{{max-width:1180px;margin:20px auto;padding:0 16px;display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px}}
+.main{{background:#fff;border:1px solid var(--line);border-radius:10px;padding:22px}}
+.head{{display:flex;align-items:center;gap:10px}} .head img{{width:42px;height:42px;border-radius:10px;border:1px solid #d8e4ef}}
+.main h1{{margin:0;font-size:30px}} .meta{{font-size:13px;color:var(--muted);margin:8px 0 12px}}
+.desc{{line-height:1.95;font-size:17px;background:#f8fbff;border:1px solid #e2edf7;border-radius:10px;padding:14px}}
+.btns a{{display:inline-block;padding:8px 12px;border-radius:10px;text-decoration:none;margin-right:8px}} .p{{background:#0f9d90;color:#fff}} .g{{background:#ecf7f5;color:#0a7f74}}
 .grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:18px}}
-.panel{{border:1px solid #d8e4ef;border-radius:10px;padding:12px}} .panel-h{{display:flex;justify-content:space-between;align-items:center}}
-.panel a{{color:#0a7f74;text-decoration:none}}
-</style></head><body><main class=\"wrap\"><article class=\"card\">
-<div class=\"head\">{f'<img src="{html.escape(icon_on_detail)}" alt="logo" />' if icon_on_detail else ''}<h1>{html.escape(item['title'])}</h1></div>
-<p class=\"meta\">分类：{html.escape(item['category'])}</p>
-<p class=\"desc\">{html.escape(intro)}</p>
-<div class=\"btns\"><a class=\"p\" href=\"{html.escape(item['url'])}\" target=\"_blank\" rel=\"noopener noreferrer\">官网链接</a><a class=\"g\" href=\"../index.html\">返回导航</a></div>
-<div class=\"grid\">{''.join(sections_html)}</div>
-</article></main></body></html>"""
+.panel{{border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff}} .panel-h{{display:flex;justify-content:space-between;align-items:center}} .panel a{{color:#16507c;text-decoration:none}}
+.side{{display:grid;gap:14px}} .ad{{background:linear-gradient(120deg,#eef4fb,#f8fbff);border:1px dashed #b9ccde;border-radius:10px;padding:14px;text-align:center;color:#6b85a0;font-size:13px}}
+@media(max-width:980px){{.wrap{{grid-template-columns:1fr}}}}
+</style></head><body>
+<header class="top"><div class="inner"><div class="logo">InspireHub AI频道</div><div class="date">2026-03-01</div></div></header>
+<main class="wrap"><article class="main"><div class="head">{f'<img src="{html.escape(icon_on_detail)}" alt="logo" />' if icon_on_detail else ''}<h1>{html.escape(item['title'])}</h1></div><p class="meta">分类：{html.escape(item['category'])}</p><div class="ad">广告位 A（介绍页顶部横幅）</div><p class="desc">{html.escape(intro)}</p><div class="btns"><a class="p" href="{html.escape(item['url'])}" target="_blank" rel="noopener noreferrer">官网链接</a><a class="g" href="../index.html">返回导航</a></div><div class="grid">{''.join(sections_html)}</div></article>
+<aside class="side"><div class="ad">广告位 B（右侧通栏）</div><div class="ad">广告位 C（右侧补充）</div></aside></main></body></html>"""
         (pages_dir / detail_name).write_text(detail_html, encoding="utf-8")
 
 
