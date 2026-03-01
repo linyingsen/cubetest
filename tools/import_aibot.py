@@ -78,6 +78,7 @@ def scrape(timeout: int = 30):
 
     children = [c for c in content_layout.children if getattr(c, "name", None)]
     data = []
+    seen_links = set()
 
     def extract_links(container, category_name):
         links = []
@@ -88,7 +89,9 @@ def scrape(timeout: int = 30):
             profile_url = urljoin(URL, card.get("href") or "")
             icon_el = card.select_one(".url-img img")
             icon = icon_el.get("data-src") or icon_el.get("src") if icon_el else ""
-            if title and external_url:
+            key = profile_url or external_url
+            if title and external_url and key not in seen_links:
+                seen_links.add(key)
                 links.append({
                     "category": category_name,
                     "title": title,
@@ -99,6 +102,41 @@ def scrape(timeout: int = 30):
                 })
         return links
 
+    def crawl_more_pages(start_url: str, category_name: str, max_pages: int = 30):
+        visited = set()
+        next_url = start_url
+        pages = 0
+        while next_url and next_url not in visited and pages < max_pages:
+            visited.add(next_url)
+            pages += 1
+            try:
+                page_html = fetch_html(next_url, timeout=timeout)
+            except Exception:
+                break
+            psoup = BeautifulSoup(page_html, "lxml")
+            data.extend(extract_links(psoup, category_name))
+
+            nxt = psoup.select_one("a.next, .next-page a, .page-numbers.next")
+            if nxt and nxt.get("href"):
+                next_url = urljoin(next_url, nxt.get("href"))
+                continue
+
+            m = re.search(r"/page/(\d+)/?$", next_url)
+            if m:
+                n = int(m.group(1)) + 1
+                candidate = re.sub(r"/page/\d+/?$", f"/page/{n}/", next_url)
+            else:
+                candidate = next_url.rstrip("/") + "/page/2/"
+            if candidate in visited:
+                break
+            try:
+                test_html = fetch_html(candidate, timeout=timeout)
+            except Exception:
+                break
+            if not BeautifulSoup(test_html, "lxml").select("div.url-card a.card[href]"):
+                break
+            next_url = candidate
+
     i = 0
     while i < len(children):
         node = children[i]
@@ -106,6 +144,10 @@ def scrape(timeout: int = 30):
         if node.name == "div" and {"d-flex", "flex-fill", "align-items-center", "mb-4"}.issubset(classes):
             h4 = node.select_one("h4")
             main_cat = clean(h4.get_text(" ")) if h4 else "未命名分类"
+            more_link = node.select_one("a.btn-move[href]")
+            if more_link and more_link.get("href"):
+                crawl_more_pages(urljoin(URL, more_link.get("href")), main_cat)
+
             i += 1
             while i < len(children):
                 cur = children[i]
@@ -128,35 +170,46 @@ def scrape(timeout: int = 30):
         i += 1
 
     return data
-
-
 def extract_profile_full(profile_html: str) -> str:
     from bs4 import BeautifulSoup
 
     soup = BeautifulSoup(profile_html, "lxml")
     chunks = []
+
     for selector in ['meta[name="description"]', 'meta[property="og:description"]']:
         node = soup.select_one(selector)
         if node and node.get("content"):
             chunks.append(clean(node.get("content")))
-    for p in soup.select(".site-content p, .entry-content p, .panel-body p, article p"):
-        t = clean(p.get_text(" "))
-        if len(t) > 16:
-            chunks.append(t)
-    for li in soup.select(".site-content li, .entry-content li, article li"):
-        t = clean(li.get_text(" "))
-        if len(t) > 10:
-            chunks.append(t)
+
+    for selector in [
+        ".entry-content p", ".site-content p", ".panel-body p", "article p", "main p"
+    ]:
+        for p in soup.select(selector):
+            t = clean(p.get_text(" "))
+            if len(t) > 16:
+                chunks.append(t)
+
+    for selector in [
+        ".entry-content li", ".site-content li", "article li", "main li"
+    ]:
+        for li in soup.select(selector):
+            t = clean(li.get_text(" "))
+            if len(t) > 10:
+                chunks.append(t)
+
+    if not chunks:
+        for node in soup.select("div, section"):
+            t = clean(node.get_text(" "))
+            if 40 < len(t) < 400:
+                chunks.append(t)
 
     unique, seen = [], set()
     for c in chunks:
-        k = c[:120]
+        k = c[:140]
         if k not in seen:
             seen.add(k)
             unique.append(c)
-    return " ".join(unique[:40])
-
-
+    return " ".join(unique[:80])
 def infer_icon_ext(icon_url: str) -> str:
     ext = os.path.splitext(urlparse(icon_url).path.lower())[1]
     return ext if ext in {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".ico"} else ".png"
