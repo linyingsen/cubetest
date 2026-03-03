@@ -9,6 +9,7 @@
 - name
 - the_class
 - old_url
+- detail_url
 - logo_url
 - the_memo
 
@@ -33,6 +34,7 @@ class AiUrl:
     name: str
     the_class: str
     old_url: str
+    detail_url: str
     logo_url: str
     the_memo: str
 
@@ -63,9 +65,11 @@ def _extract_links(container, category_name: str, seen: set[str]) -> list[AiUrl]
         name = clean(title_el.get_text(" ")) if title_el else ""
         the_memo = clean(desc_el.get_text(" ")) if desc_el else ""
         old_url = clean(card.get("data-url") or card.get("href") or "")
+        detail_url = clean(card.get("href") or "")
         logo_url = clean((icon_el.get("data-src") or icon_el.get("src") or "") if icon_el else "")
 
         old_url = urljoin(BASE_URL, old_url)
+        detail_url = urljoin(BASE_URL, detail_url) if detail_url else ""
         logo_url = urljoin(BASE_URL, logo_url) if logo_url else ""
 
         if not name or not old_url:
@@ -81,6 +85,7 @@ def _extract_links(container, category_name: str, seen: set[str]) -> list[AiUrl]
                 name=name,
                 the_class=category_name,
                 old_url=old_url,
+                detail_url=detail_url,
                 logo_url=logo_url,
                 the_memo=the_memo,
             )
@@ -164,6 +169,7 @@ MERGE dbo.ai_url AS target
 USING (
     SELECT
         {sql_quote(row.old_url)} AS old_url,
+        {sql_quote(row.detail_url)} AS detail_url,
         {sql_quote(row.name)} AS name,
         {sql_quote(row.the_class)} AS the_class,
         {sql_quote(row.logo_url)} AS logo_url,
@@ -174,11 +180,12 @@ WHEN MATCHED THEN
     UPDATE SET
         name = source.name,
         the_class = source.the_class,
+        detail_url = source.detail_url,
         logo_url = source.logo_url,
         the_memo = source.the_memo
 WHEN NOT MATCHED THEN
-    INSERT (name, the_class, old_url, logo_url, the_memo)
-    VALUES (source.name, source.the_class, source.old_url, source.logo_url, source.the_memo);
+    INSERT (name, the_class, old_url, detail_url, logo_url, the_memo)
+    VALUES (source.name, source.the_class, source.old_url, source.detail_url, source.logo_url, source.the_memo);
 GO
 """.strip()
 
@@ -193,9 +200,17 @@ BEGIN
         name NVARCHAR(500) NOT NULL,
         the_class NVARCHAR(500) NOT NULL,
         old_url NVARCHAR(1000) NOT NULL PRIMARY KEY,
+        detail_url NVARCHAR(1000) NULL,
         logo_url NVARCHAR(1000) NULL,
         the_memo NVARCHAR(MAX) NULL
     );
+END
+GO
+"""
+    header += """
+IF COL_LENGTH('dbo.ai_url', 'detail_url') IS NULL
+BEGIN
+    ALTER TABLE dbo.ai_url ADD detail_url NVARCHAR(1000) NULL;
 END
 GO
 """
