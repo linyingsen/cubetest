@@ -28,33 +28,62 @@ body {
 }
 
 .site-top-nav {
-  background: #fff;
-  border-bottom: 1px solid #e8edf3;
-  box-shadow: 0 2px 10px rgba(27, 63, 90, 0.04);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.9);
+  border-bottom: 1px solid #e3ebf3;
+  box-shadow: 0 10px 24px rgba(19, 46, 73, 0.06);
 }
 
 .site-top-nav::after {
   content: "";
   display: block;
-  height: 8px;
-  background: linear-gradient(90deg, #91c89a, #7fbe8d);
+  height: 6px;
+  background: linear-gradient(90deg, #97cfa0, #7abf8a 45%, #62b49d 100%);
 }
 
 .site-top-nav__inner {
-  min-height: 78px;
+  min-height: 84px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  gap: 26px;
 }
 
 .site-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
   text-decoration: none;
-  color: #2f2f2f;
-  font-size: clamp(26px, 2.4vw, 40px);
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  color: #203243;
   white-space: nowrap;
+}
+
+.site-brand__logo {
+  width: clamp(46px, 3.2vw, 56px);
+  height: clamp(46px, 3.2vw, 56px);
+  border-radius: 13px;
+}
+
+.site-brand__text-group {
+  display: grid;
+  gap: 2px;
+}
+
+.site-brand__title {
+  font-size: clamp(24px, 2.1vw, 33px);
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.site-brand__domain {
+  color: #557089;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
 }
 
 .site-top-nav__links {
@@ -62,17 +91,17 @@ body {
   align-items: center;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 24px;
+  gap: 22px;
 }
 
 .site-top-nav__links a {
   text-decoration: none;
-  color: #1f2f3d;
-  font-size: 18px;
-  font-weight: 600;
+  color: #1f3245;
+  font-size: 17px;
+  font-weight: 700;
   position: relative;
-  padding: 4px 0;
-  transition: color 0.2s ease;
+  padding: 6px 0;
+  transition: color 0.2s ease, transform 0.2s ease;
 }
 
 .site-top-nav__links a::after {
@@ -92,6 +121,7 @@ body {
 .site-top-nav__links a:hover,
 .site-top-nav__links a:focus-visible {
   color: var(--brand-strong);
+  transform: translateY(-1px);
 }
 
 .site-top-nav__links a:hover::after,
@@ -356,16 +386,25 @@ body {
     flex-direction: column;
     align-items: flex-start;
     justify-content: center;
-    padding: 12px 0 16px;
+    padding: 12px 0 14px;
     gap: 12px;
   }
 
-  .site-brand {
-    font-size: clamp(22px, 7vw, 30px);
+  .site-brand__logo {
+    width: 42px;
+    height: 42px;
+  }
+
+  .site-brand__title {
+    font-size: clamp(20px, 7vw, 28px);
+  }
+
+  .site-brand__domain {
+    font-size: 11px;
   }
 
   .site-top-nav__links {
-    gap: 14px 18px;
+    gap: 10px 16px;
     justify-content: flex-start;
   }
 
