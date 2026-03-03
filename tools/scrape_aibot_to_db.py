@@ -1,21 +1,26 @@
 #!/usr/bin/env python3
-"""抓取 ai-bot.cn 首页导航数据并写入 SQLite 数据库。
+"""抓取 ai-bot.cn 首页导航数据并写入 SQL Server 数据库 ai.ai_url。
 
-默认会创建/使用当前目录下的 `ai.db`，并写入表 `ai_url`：
+目标表结构：
 - name
 - the_class
 - old_url
 - logo_url
 - the_memo
 
-依赖：beautifulsoup4, lxml
-安装：pip install beautifulsoup4 lxml
+默认连接参数：
+- server: localhost
+- database: ai
+- user: sa
+- password: saa1b2C3sa
+
+依赖：beautifulsoup4, lxml, pyodbc
+安装：pip install beautifulsoup4 lxml pyodbc
 """
 from __future__ import annotations
 
 import argparse
 import re
-import sqlite3
 from dataclasses import dataclass
 from typing import Iterable
 from urllib.error import HTTPError, URLError
@@ -151,35 +156,61 @@ def scrape_home_all(timeout: int = 30) -> list[AiUrl]:
     return all_rows
 
 
-def init_db(conn: sqlite3.Connection) -> None:
-    conn.execute(
+def connect_sqlserver(server: str, database: str, user: str, password: str, driver: str):
+    try:
+        import pyodbc
+    except ModuleNotFoundError as exc:
+        raise RuntimeError("缺少依赖 pyodbc，请先安装：pip install pyodbc") from exc
+
+    conn_str = (
+        f"DRIVER={{{driver}}};"
+        f"SERVER={server};"
+        f"DATABASE={database};"
+        f"UID={user};"
+        f"PWD={password};"
+        "TrustServerCertificate=yes;"
+    )
+    return pyodbc.connect(conn_str)
+
+
+def init_table(conn) -> None:
+    conn.cursor().execute(
         """
-        CREATE TABLE IF NOT EXISTS ai_url (
-            name TEXT NOT NULL,
-            the_class TEXT NOT NULL,
-            old_url TEXT NOT NULL PRIMARY KEY,
-            logo_url TEXT,
-            the_memo TEXT
-        )
+        IF OBJECT_ID(N'dbo.ai_url', N'U') IS NULL
+        BEGIN
+            CREATE TABLE dbo.ai_url (
+                name NVARCHAR(500) NOT NULL,
+                the_class NVARCHAR(500) NOT NULL,
+                old_url NVARCHAR(1000) NOT NULL PRIMARY KEY,
+                logo_url NVARCHAR(1000) NULL,
+                the_memo NVARCHAR(MAX) NULL
+            );
+        END
         """
     )
+    conn.commit()
 
 
-def save_rows(conn: sqlite3.Connection, rows: Iterable[AiUrl]) -> int:
+def save_rows(conn, rows: Iterable[AiUrl]) -> int:
     cur = conn.cursor()
     count = 0
     for row in rows:
         cur.execute(
             """
-            INSERT INTO ai_url (name, the_class, old_url, logo_url, the_memo)
-            VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(old_url) DO UPDATE SET
-                name=excluded.name,
-                the_class=excluded.the_class,
-                logo_url=excluded.logo_url,
-                the_memo=excluded.the_memo
+            MERGE dbo.ai_url AS target
+            USING (SELECT ? AS old_url, ? AS name, ? AS the_class, ? AS logo_url, ? AS the_memo) AS source
+            ON target.old_url = source.old_url
+            WHEN MATCHED THEN
+                UPDATE SET
+                    name = source.name,
+                    the_class = source.the_class,
+                    logo_url = source.logo_url,
+                    the_memo = source.the_memo
+            WHEN NOT MATCHED THEN
+                INSERT (name, the_class, old_url, logo_url, the_memo)
+                VALUES (source.name, source.the_class, source.old_url, source.logo_url, source.the_memo);
             """,
-            (row.name, row.the_class, row.old_url, row.logo_url, row.the_memo),
+            (row.old_url, row.name, row.the_class, row.logo_url, row.the_memo),
         )
         count += 1
     conn.commit()
@@ -187,18 +218,25 @@ def save_rows(conn: sqlite3.Connection, rows: Iterable[AiUrl]) -> int:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="抓取 ai-bot.cn 并写入数据库 ai(ai.db) 的 ai_url 表")
-    parser.add_argument("--db", default="ai.db", help="SQLite 数据库文件路径，默认 ai.db")
-    parser.add_argument("--timeout", type=int, default=30, help="请求超时时间（秒）")
+    parser = argparse.ArgumentParser(description="抓取 ai-bot.cn 并写入 SQL Server 数据库 ai 的 ai_url 表")
+    parser.add_argument("--server", default="localhost", help="SQL Server 地址，默认 localhost")
+    parser.add_argument("--database", default="ai", help="数据库名，默认 ai")
+    parser.add_argument("--user", default="sa", help="登录用户，默认 sa")
+    parser.add_argument("--password", default="saa1b2C3sa", help="登录密码")
+    parser.add_argument("--driver", default="ODBC Driver 18 for SQL Server", help="ODBC 驱动名")
+    parser.add_argument("--timeout", type=int, default=30, help="抓取超时秒数")
     args = parser.parse_args()
 
     rows = scrape_home_all(timeout=args.timeout)
-    with sqlite3.connect(args.db) as conn:
-        init_db(conn)
+    conn = connect_sqlserver(args.server, args.database, args.user, args.password, args.driver)
+    try:
+        init_table(conn)
         total = save_rows(conn, rows)
+    finally:
+        conn.close()
 
     print(f"抓取完成：共 {len(rows)} 条，写入/更新 {total} 条")
-    print(f"数据库文件：{args.db}")
+    print(f"目标库：{args.server}/{args.database}，目标表：dbo.ai_url")
 
 
 if __name__ == "__main__":
