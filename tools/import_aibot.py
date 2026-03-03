@@ -10,7 +10,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import html
-import imghdr
 import mimetypes
 import os
 import re
@@ -143,14 +142,24 @@ def scrape_homepage_only(timeout: int = 30):
 
 
 def detect_ext(icon_url: str, content: bytes, content_type: str = "") -> str:
-    kind = imghdr.what(None, h=content)
-    if kind:
-        return ".jpg" if kind == "jpeg" else f".{kind}"
+    # `imghdr` is removed in newer Python versions (e.g. 3.13), so rely on
+    # content-type + url suffix fallback for cross-version compatibility.
     ext = mimetypes.guess_extension((content_type or "").split(";")[0].strip())
-    if ext:
+    if ext in {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".ico", ".bmp"}:
         return ext
     from_url = os.path.splitext(urlparse(icon_url).path.lower())[1]
-    return from_url if from_url in {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".ico"} else ".png"
+    if from_url in {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".ico", ".bmp"}:
+        return from_url
+    # tiny signature-based fallback (no extra dependency)
+    if content.startswith(b"\x89PNG"):
+        return ".png"
+    if content[:3] == b"\xff\xd8\xff":
+        return ".jpg"
+    if content.startswith(b"GIF87a") or content.startswith(b"GIF89a"):
+        return ".gif"
+    if content.startswith(b"RIFF") and b"WEBP" in content[:16]:
+        return ".webp"
+    return ".png"
 
 
 def download_icons(imported, project_root: Path, icons_dir: Path, timeout: int = 30):
