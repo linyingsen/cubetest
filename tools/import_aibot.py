@@ -69,6 +69,19 @@ def fetch_response(url: str, timeout: int = 30):
     return urlopen(req, timeout=timeout)
 
 
+def fetch_binary(url: str, timeout: int = 30, referer: str = URL):
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        "Referer": referer,
+        "Origin": "https://ai-bot.cn",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+    }
+    req = Request(url, headers=headers)
+    with urlopen(req, timeout=timeout) as resp:
+        return resp.read(), resp.headers.get("Content-Type", "")
+
+
 def scrape_homepage_only(timeout: int = 30):
     try:
         from bs4 import BeautifulSoup
@@ -159,32 +172,101 @@ def detect_ext(icon_url: str, content: bytes, content_type: str = "") -> str:
         return ".gif"
     if content.startswith(b"RIFF") and b"WEBP" in content[:16]:
         return ".webp"
+    if b"<svg" in content[:512].lower():
+        return ".svg"
+    if content[:4] == b"\x00\x00\x01\x00":
+        return ".ico"
     return ".png"
+
+
+def looks_like_image(content: bytes, content_type: str = "") -> bool:
+    ctype = (content_type or "").lower()
+    if ctype.startswith("image/"):
+        return True
+    if b"<svg" in content[:512].lower():
+        return True
+    if content.startswith(b"\x89PNG"):
+        return True
+    if content[:3] == b"\xff\xd8\xff":
+        return True
+    if content.startswith(b"GIF87a") or content.startswith(b"GIF89a"):
+        return True
+    if content.startswith(b"RIFF") and b"WEBP" in content[:16]:
+        return True
+    if content[:4] == b"\x00\x00\x01\x00":
+        return True
+    return False
+
+
+def icon_candidates(item: dict) -> list[str]:
+    candidates = []
+    raw_icon = (item.get("icon") or "").strip()
+    if raw_icon:
+        candidates.append(urljoin(URL, raw_icon))
+
+    profile_url = (item.get("profile_url") or "").strip()
+    if profile_url:
+        p = urlparse(profile_url)
+        if p.scheme and p.netloc:
+            candidates.append(f"{p.scheme}://{p.netloc}/favicon.ico")
+
+    site_url = (item.get("url") or "").strip()
+    if site_url:
+        s = urlparse(site_url)
+        if s.scheme and s.netloc:
+            candidates.append(f"{s.scheme}://{s.netloc}/favicon.ico")
+
+    # dedupe while preserving order
+    uniq = []
+    seen = set()
+    for candidate in candidates:
+        if candidate and candidate not in seen:
+            uniq.append(candidate)
+            seen.add(candidate)
+    return uniq
 
 
 def download_icons(imported, project_root: Path, icons_dir: Path, timeout: int = 30):
     icons_dir.mkdir(parents=True, exist_ok=True)
     cache = {}
+    success_count = 0
+    fail_count = 0
     for idx, item in enumerate(imported, 1):
-        icon_url = item.get("icon") or ""
-        if not icon_url:
+        candidates = icon_candidates(item)
+        if not candidates:
+            fail_count += 1
             continue
-        if icon_url in cache:
-            item["local_icon"] = cache[icon_url]
-            continue
-        try:
-            with fetch_response(icon_url, timeout=timeout) as resp:
-                content = resp.read()
-                content_type = resp.headers.get("Content-Type", "")
-        except Exception:
-            continue
-        ext = detect_ext(icon_url, content, content_type)
-        fname = f"{idx:04d}-{slug_from_item(item)}{ext}"
-        path = icons_dir / fname
-        path.write_bytes(content)
-        rel = path.relative_to(project_root).as_posix()
-        item["local_icon"] = rel
-        cache[icon_url] = rel
+
+        downloaded = False
+        for candidate in candidates:
+            if candidate in cache:
+                item["local_icon"] = cache[candidate]
+                downloaded = True
+                break
+            try:
+                content, content_type = fetch_binary(candidate, timeout=timeout)
+            except Exception:
+                continue
+
+            if not looks_like_image(content, content_type):
+                continue
+
+            ext = detect_ext(candidate, content, content_type)
+            fname = f"{idx:04d}-{slug_from_item(item)}{ext}"
+            path = icons_dir / fname
+            path.write_bytes(content)
+            rel = path.relative_to(project_root).as_posix()
+            item["local_icon"] = rel
+            cache[candidate] = rel
+            downloaded = True
+            break
+
+        if downloaded:
+            success_count += 1
+        else:
+            fail_count += 1
+
+    print(f"Icon download summary: success={success_count}, failed={fail_count}")
 
 
 def top_nav_html() -> str:
