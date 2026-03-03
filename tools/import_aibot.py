@@ -386,14 +386,13 @@ def render(imported):
         for item in items:
             icon_rel = html.escape(item.get("local_icon", ""))
             icon_html = f'<img class="site-icon" src="{icon_rel}" alt="{html.escape(item["title"])} 图标" loading="lazy" />' if icon_rel else '<span class="site-icon site-icon--placeholder" aria-hidden="true"></span>'
+            local_page = html.escape(item.get("local_page", "#"))
             out.append(
                 "    <article class=\"site-card site-card--rich\""
                 f" data-keywords=\"{html.escape(item['category'])}\">"
-                f"<div class=\"site-card__top\">{icon_html}<h3 class=\"site-title\">{html.escape(item['title'])}</h3></div>"
+                f"<div class=\"site-card__top\">{icon_html}<h3 class=\"site-title\"><a class=\"site-title-link\" href=\"{local_page}\">{html.escape(item['title'])}</a></h3></div>"
                 f"<p class=\"site-desc\">{html.escape(item['desc'])}</p>"
-                f"<span class=\"site-meta\">{html.escape(item['category'])}</span>"
-                f"<div class=\"site-actions\"><a href=\"{html.escape(item.get('local_page','#'))}\" class=\"site-link\">查看本地介绍</a>"
-                f"<a href=\"{html.escape(item['url'])}\" class=\"site-link site-link--ghost\" target=\"_blank\" rel=\"noopener noreferrer\">访问官网</a></div></article>"
+                "</article>"
             )
         out.extend(["  </div>", "</section>"])
 

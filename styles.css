@@ -325,6 +325,19 @@ body {
   color: var(--ink);
 }
 
+.site-title-link {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.site-title-link:hover,
+.site-title-link:focus-visible {
+  color: var(--brand-strong);
+  border-bottom-color: rgba(10, 127, 116, 0.35);
+}
+
 .site-desc {
   margin: 0;
   font-size: 13px;
