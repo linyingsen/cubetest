@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Import ai-bot.cn links into index.html and generate local AI detail/article pages.
+"""Import ai-bot.cn homepage links into index.html and generate local detail pages.
 
 Usage:
   pip install beautifulsoup4 lxml
@@ -10,6 +10,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import html
+import imghdr
+import mimetypes
 import os
 import re
 from pathlib import Path
@@ -20,6 +22,15 @@ from urllib.request import Request, urlopen
 URL = "https://ai-bot.cn/"
 START = "<!-- AI_BOT_IMPORT_START -->"
 END = "<!-- AI_BOT_IMPORT_END -->"
+TOP_NAV = [
+    ("首页", "../index.html"),
+    ("AI工具", "#"),
+    ("AI教程", "#"),
+    ("AI提示词", "#"),
+    ("MCP", "#"),
+    ("Skill", "#"),
+    ("AI资讯", "#"),
+]
 
 
 def clean(text: str) -> str:
@@ -54,13 +65,12 @@ def fetch_html(url: str, timeout: int = 30) -> str:
         return resp.read().decode("utf-8", errors="replace")
 
 
-def fetch_bytes(url: str, timeout: int = 30) -> bytes:
+def fetch_response(url: str, timeout: int = 30):
     req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urlopen(req, timeout=timeout) as resp:
-        return resp.read()
+    return urlopen(req, timeout=timeout)
 
 
-def scrape(timeout: int = 30):
+def scrape_homepage_only(timeout: int = 30):
     try:
         from bs4 import BeautifulSoup
     except ModuleNotFoundError as exc:
@@ -77,8 +87,7 @@ def scrape(timeout: int = 30):
         raise RuntimeError("Unable to find .content-layout on ai-bot homepage")
 
     children = [c for c in content_layout.children if getattr(c, "name", None)]
-    data = []
-    seen_links = set()
+    data, seen = [], set()
 
     def extract_links(container, category_name):
         links = []
@@ -90,8 +99,8 @@ def scrape(timeout: int = 30):
             icon_el = card.select_one(".url-img img")
             icon = icon_el.get("data-src") or icon_el.get("src") if icon_el else ""
             key = profile_url or external_url
-            if title and external_url and key not in seen_links:
-                seen_links.add(key)
+            if title and external_url and key not in seen:
+                seen.add(key)
                 links.append({
                     "category": category_name,
                     "title": title,
@@ -102,41 +111,6 @@ def scrape(timeout: int = 30):
                 })
         return links
 
-    def crawl_more_pages(start_url: str, category_name: str, max_pages: int = 30):
-        visited = set()
-        next_url = start_url
-        pages = 0
-        while next_url and next_url not in visited and pages < max_pages:
-            visited.add(next_url)
-            pages += 1
-            try:
-                page_html = fetch_html(next_url, timeout=timeout)
-            except Exception:
-                break
-            psoup = BeautifulSoup(page_html, "lxml")
-            data.extend(extract_links(psoup, category_name))
-
-            nxt = psoup.select_one("a.next, .next-page a, .page-numbers.next")
-            if nxt and nxt.get("href"):
-                next_url = urljoin(next_url, nxt.get("href"))
-                continue
-
-            m = re.search(r"/page/(\d+)/?$", next_url)
-            if m:
-                n = int(m.group(1)) + 1
-                candidate = re.sub(r"/page/\d+/?$", f"/page/{n}/", next_url)
-            else:
-                candidate = next_url.rstrip("/") + "/page/2/"
-            if candidate in visited:
-                break
-            try:
-                test_html = fetch_html(candidate, timeout=timeout)
-            except Exception:
-                break
-            if not BeautifulSoup(test_html, "lxml").select("div.url-card a.card[href]"):
-                break
-            next_url = candidate
-
     i = 0
     while i < len(children):
         node = children[i]
@@ -144,10 +118,6 @@ def scrape(timeout: int = 30):
         if node.name == "div" and {"d-flex", "flex-fill", "align-items-center", "mb-4"}.issubset(classes):
             h4 = node.select_one("h4")
             main_cat = clean(h4.get_text(" ")) if h4 else "未命名分类"
-            more_link = node.select_one("a.btn-move[href]")
-            if more_link and more_link.get("href"):
-                crawl_more_pages(urljoin(URL, more_link.get("href")), main_cat)
-
             i += 1
             while i < len(children):
                 cur = children[i]
@@ -170,49 +140,17 @@ def scrape(timeout: int = 30):
         i += 1
 
     return data
-def extract_profile_full(profile_html: str) -> str:
-    from bs4 import BeautifulSoup
 
-    soup = BeautifulSoup(profile_html, "lxml")
-    chunks = []
 
-    for selector in ['meta[name="description"]', 'meta[property="og:description"]']:
-        node = soup.select_one(selector)
-        if node and node.get("content"):
-            chunks.append(clean(node.get("content")))
-
-    for selector in [
-        ".entry-content p", ".site-content p", ".panel-body p", "article p", "main p"
-    ]:
-        for p in soup.select(selector):
-            t = clean(p.get_text(" "))
-            if len(t) > 16:
-                chunks.append(t)
-
-    for selector in [
-        ".entry-content li", ".site-content li", "article li", "main li"
-    ]:
-        for li in soup.select(selector):
-            t = clean(li.get_text(" "))
-            if len(t) > 10:
-                chunks.append(t)
-
-    if not chunks:
-        for node in soup.select("div, section"):
-            t = clean(node.get_text(" "))
-            if 40 < len(t) < 400:
-                chunks.append(t)
-
-    unique, seen = [], set()
-    for c in chunks:
-        k = c[:140]
-        if k not in seen:
-            seen.add(k)
-            unique.append(c)
-    return " ".join(unique[:80])
-def infer_icon_ext(icon_url: str) -> str:
-    ext = os.path.splitext(urlparse(icon_url).path.lower())[1]
-    return ext if ext in {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".ico"} else ".png"
+def detect_ext(icon_url: str, content: bytes, content_type: str = "") -> str:
+    kind = imghdr.what(None, h=content)
+    if kind:
+        return ".jpg" if kind == "jpeg" else f".{kind}"
+    ext = mimetypes.guess_extension((content_type or "").split(";")[0].strip())
+    if ext:
+        return ext
+    from_url = os.path.splitext(urlparse(icon_url).path.lower())[1]
+    return from_url if from_url in {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".ico"} else ".png"
 
 
 def download_icons(imported, project_root: Path, icons_dir: Path, timeout: int = 30):
@@ -226,10 +164,13 @@ def download_icons(imported, project_root: Path, icons_dir: Path, timeout: int =
             item["local_icon"] = cache[icon_url]
             continue
         try:
-            content = fetch_bytes(icon_url, timeout=timeout)
+            with fetch_response(icon_url, timeout=timeout) as resp:
+                content = resp.read()
+                content_type = resp.headers.get("Content-Type", "")
         except Exception:
             continue
-        fname = f"{idx:04d}-{slug_from_item(item)}{infer_icon_ext(icon_url)}"
+        ext = detect_ext(icon_url, content, content_type)
+        fname = f"{idx:04d}-{slug_from_item(item)}{ext}"
         path = icons_dir / fname
         path.write_bytes(content)
         rel = path.relative_to(project_root).as_posix()
@@ -237,36 +178,48 @@ def download_icons(imported, project_root: Path, icons_dir: Path, timeout: int =
         cache[icon_url] = rel
 
 
-def build_article_items(title: str, category: str, long_intro: str, kind: str):
-    kind_cn = {"news": "新闻资讯", "tips": "使用技巧", "prompts": "提示词"}[kind]
-    seeds = [s for s in re.split(r"[。！？!?]", long_intro) if clean(s)]
-    if not seeds:
-        seeds = [f"{title} 在 {category} 方向持续更新能力。"]
-
-    items = []
-    for i in range(1, 7):
-        base = clean(seeds[(i - 1) % len(seeds)])
-        if kind == "news":
-            head = f"{title}{kind_cn}速递 {i}"
-        elif kind == "tips":
-            head = f"{title}实战技巧 {i}"
-        else:
-            head = f"{title}高效提示词 {i}"
-        excerpt = f"围绕“{base[:36]}”整理的 {kind_cn} 要点，适合快速了解与落地。"
-        body = (
-            f"{head}\n\n"
-            f"本文基于 {title} 的公开资料进行整理。{base}"
-            f" 在实际应用中，可结合具体任务拆解目标、输入约束与输出格式，"
-            f"并通过多轮迭代提升结果稳定性。"
-        )
-        items.append({"title": head, "excerpt": excerpt, "body": body})
-    return items
+def top_nav_html() -> str:
+    return '<nav class="top-nav">' + ''.join(
+        f'<a href="{html.escape(href)}">{html.escape(name)}</a>' for name, href in TOP_NAV
+    ) + '</nav>'
 
 
-def generate_detail_and_articles(imported, project_root: Path, pages_dir: Path, timeout: int = 30):
+def extract_detail_content(profile_html: str):
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(profile_html, "lxml")
+
+    # Try keep original layout: prefer detail container html.
+    container = (
+        soup.select_one(".entry-content")
+        or soup.select_one(".site-content")
+        or soup.select_one("article")
+        or soup.select_one("main")
+    )
+
+    content_html = ""
+    if container:
+        # remove script/style to keep clean html
+        for bad in container.select("script, style, noscript"):
+            bad.decompose()
+        # normalize relative image/src links
+        for tag in container.select("img[src], a[href], source[src], video[src]"):
+            attr = "href" if tag.has_attr("href") else "src"
+            tag[attr] = urljoin(URL, tag.get(attr) or "")
+        content_html = str(container)
+
+    # fallback summary for cards/description
+    meta = soup.select_one('meta[name="description"]')
+    summary = clean(meta.get("content")) if meta and meta.get("content") else ""
+    if not summary:
+        p = soup.select_one(".entry-content p, .site-content p, article p, main p")
+        summary = clean(p.get_text(" ")) if p else ""
+
+    return summary, content_html
+
+
+def generate_detail_pages(imported, project_root: Path, pages_dir: Path, timeout: int = 30):
     pages_dir.mkdir(parents=True, exist_ok=True)
-    article_root = project_root / "articles"
-    article_root.mkdir(parents=True, exist_ok=True)
     profile_cache = {}
 
     for item in imported:
@@ -275,7 +228,7 @@ def generate_detail_and_articles(imported, project_root: Path, pages_dir: Path, 
         item["local_page"] = f"{pages_dir.name}/{detail_name}"
 
         profile_url = item.get("profile_url", "")
-        profile_full = ""
+        detail_summary, detail_html = "", ""
         if profile_url:
             if profile_url not in profile_cache:
                 try:
@@ -283,100 +236,35 @@ def generate_detail_and_articles(imported, project_root: Path, pages_dir: Path, 
                 except Exception:
                     profile_cache[profile_url] = ""
             if profile_cache[profile_url]:
-                profile_full = extract_profile_full(profile_cache[profile_url])
+                detail_summary, detail_html = extract_detail_content(profile_cache[profile_url])
 
-        intro = profile_full or item.get("desc") or f"{item['title']} 是一个面向 {item['category']} 的 AI 服务。"
-
+        intro = detail_summary or item.get("desc") or f"{item['title']} 是一个面向 {item['category']} 的 AI 服务。"
         icon_rel = item.get("local_icon", "")
         icon_on_detail = (Path("..") / icon_rel).as_posix() if icon_rel else ""
 
-        sections_html = []
-        for kind, cn in [("news", "新闻资讯"), ("tips", "使用技巧"), ("prompts", "提示词")]:
-            list_name = f"{slug}-{kind}.html"
-            list_rel = f"../articles/{list_name}"
-            articles = build_article_items(item["title"], item["category"], intro, kind)
-
-            list_rows = []
-            for idx, art in enumerate(articles, 1):
-                detail_file = f"{slug}-{kind}-{idx}.html"
-                list_rows.append(
-                    f'<article class="news-item"><h2><a href="{html.escape(detail_file)}">{html.escape(art["title"])}</a></h2><p>{html.escape(art["excerpt"])}</p><div class="meta">来源：InspireHub · 分类：{cn}</div></article>'
-                )
-
-                detail_html = f"""<!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(art['title'])}</title>
-<style>
-:root{{--bg:#f2f5f9;--surface:#fff;--ink:#1b3550;--muted:#5d748a;--brand:#c2181e;--line:#d9e2ec}}
-body{{margin:0;background:var(--bg);font-family:PingFang SC,Microsoft YaHei,sans-serif;color:var(--ink)}}
-.top{{background:#fff;border-bottom:1px solid var(--line)}} .top .inner{{max-width:1180px;margin:0 auto;padding:14px 16px;display:flex;justify-content:space-between;align-items:center}}
-.logo{{font-weight:700}} .crumb{{color:var(--muted);font-size:13px}}
-.wrap{{max-width:1180px;margin:20px auto;padding:0 16px;display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px}}
-.main{{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:26px}}
-.main h1{{font-size:32px;line-height:1.3;margin:0 0 10px}} .meta{{font-size:13px;color:var(--muted);border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:18px}}
-.main p{{line-height:1.95;font-size:17px}}
-.ad{{background:linear-gradient(120deg,#eef4fb,#f8fbff);border:1px dashed #b9ccde;border-radius:10px;padding:14px;text-align:center;color:#6b85a0;font-size:13px}}
-.side{{display:grid;gap:14px}} .panel{{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px}}
-.panel h3{{margin:0 0 10px;font-size:16px}} .panel li{{margin:0 0 8px}} a{{color:#16507c;text-decoration:none}}
-@media(max-width:980px){{.wrap{{grid-template-columns:1fr}}}}
-</style></head><body>
-<header class="top"><div class="inner"><div class="logo">InspireHub 资讯</div><div class="crumb">{html.escape(item['title'])} / {cn}</div></div></header>
-<main class="wrap"><article class="main"><h1>{html.escape(art['title'])}</h1><div class="meta">发布时间：2026-03-01 · 作者：编辑部 · 分类：{cn}</div><div class="ad">广告位 A（文章顶部横幅）</div><p>{html.escape(art['body'])}</p><p>{html.escape(art['body'])}</p><div class="ad">广告位 B（正文中插）</div><p><a href="{html.escape(list_name)}">返回栏目列表</a></p></article>
-<aside class="side"><section class="panel"><h3>推荐阅读</h3><ul><li><a href="{html.escape(list_name)}">{html.escape(item['title'])}{cn}列表</a></li><li><a href="../{html.escape(item['local_page'])}">返回AI介绍页</a></li></ul></section><div class="ad">广告位 C（右侧矩形）</div></aside></main></body></html>"""
-                (article_root / detail_file).write_text(detail_html, encoding="utf-8")
-
-            list_html = f"""<!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(item['title'])} - {cn}</title>
+        page = f"""<!doctype html>
+<html lang=\"zh-CN\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">
+<title>{html.escape(item['title'])} - 介绍页</title>
 <style>
 :root{{--bg:#f2f5f9;--surface:#fff;--ink:#1b3550;--muted:#5d748a;--line:#d9e2ec;--accent:#c2181e}}
 body{{margin:0;background:var(--bg);font-family:PingFang SC,Microsoft YaHei,sans-serif;color:var(--ink)}}
-.top{{background:#fff;border-bottom:1px solid var(--line)}} .top .inner{{max-width:1180px;margin:0 auto;padding:14px 16px;display:flex;justify-content:space-between;align-items:center}}
-.logo{{font-weight:700}} .nav{{font-size:13px;color:var(--muted)}}
-.wrap{{max-width:1180px;margin:20px auto;padding:0 16px;display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px}}
-.main{{background:#fff;border:1px solid var(--line);border-radius:10px;padding:18px}}
-.main h1{{margin:4px 0 14px;font-size:28px;border-left:4px solid var(--accent);padding-left:10px}}
-.news-item{{padding:16px 4px;border-bottom:1px solid #e7eef5}} .news-item:last-child{{border-bottom:0}}
-.news-item h2{{font-size:22px;margin:0 0 8px;line-height:1.35}} .news-item p{{margin:0 0 10px;color:var(--muted);line-height:1.75}}
-.meta{{font-size:12px;color:#7b91a7}}
-.side{{display:grid;gap:14px}} .panel{{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px}}
-.panel h3{{margin:0 0 10px;font-size:16px}} .panel li{{margin:0 0 8px}} a{{color:#16507c;text-decoration:none}}
-.ad{{background:linear-gradient(120deg,#eef4fb,#f8fbff);border:1px dashed #b9ccde;border-radius:10px;padding:14px;text-align:center;color:#6b85a0;font-size:13px}}
-@media(max-width:980px){{.wrap{{grid-template-columns:1fr}}}}
-</style></head><body>
-<header class="top"><div class="inner"><div class="logo">InspireHub 栏目</div><div class="nav">{html.escape(item['title'])} / {cn}</div></div></header>
-<main class="wrap"><section class="main"><h1>{html.escape(item['title'])} · {cn}</h1><div class="ad">广告位 A（列表顶部横幅）</div>{''.join(list_rows)}<p><a href="../{html.escape(item['local_page'])}">返回介绍页</a></p></section>
-<aside class="side"><section class="panel"><h3>栏目导航</h3><ul><li><a href="{html.escape(slug)}-news.html">新闻资讯</a></li><li><a href="{html.escape(slug)}-tips.html">使用技巧</a></li><li><a href="{html.escape(slug)}-prompts.html">提示词</a></li></ul></section><div class="ad">广告位 B（右侧矩形）</div></aside></main></body></html>"""
-            (article_root / list_name).write_text(list_html, encoding="utf-8")
-
-            preview = "".join(
-                f'<li><a href="../articles/{slug}-{kind}-{i}.html">{html.escape(articles[i-1]["title"])}</a></li>'
-                for i in range(1, 4)
-            )
-            sections_html.append(
-                f'<section class="panel"><div class="panel-h"><h2>{cn}</h2><a href="{list_rel}">更多</a></div><ul>{preview}</ul></section>'
-            )
-
-        detail_html = f"""<!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(item['title'])} - 介绍页</title>
-<style>
-:root{{--bg:#f2f5f9;--surface:#fff;--ink:#1b3550;--muted:#5d748a;--line:#d9e2ec;--accent:#c2181e}}
-body{{margin:0;background:var(--bg);font-family:PingFang SC,Microsoft YaHei,sans-serif;color:var(--ink)}}
-.top{{background:#fff;border-bottom:1px solid var(--line)}} .top .inner{{max-width:1180px;margin:0 auto;padding:14px 16px;display:flex;justify-content:space-between;align-items:center}}
-.logo{{font-weight:700}} .date{{font-size:12px;color:var(--muted)}}
+.top-nav{{display:flex;gap:14px;flex-wrap:wrap;max-width:1180px;margin:0 auto;padding:12px 16px;background:#fff;border-bottom:1px solid var(--line)}}
+.top-nav a{{text-decoration:none;color:#1d4468;font-size:14px}}
 .wrap{{max-width:1180px;margin:20px auto;padding:0 16px;display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px}}
 .main{{background:#fff;border:1px solid var(--line);border-radius:10px;padding:22px}}
 .head{{display:flex;align-items:center;gap:10px}} .head img{{width:42px;height:42px;border-radius:10px;border:1px solid #d8e4ef}}
 .main h1{{margin:0;font-size:30px}} .meta{{font-size:13px;color:var(--muted);margin:8px 0 12px}}
 .desc{{line-height:1.95;font-size:17px;background:#f8fbff;border:1px solid #e2edf7;border-radius:10px;padding:14px}}
 .btns a{{display:inline-block;padding:8px 12px;border-radius:10px;text-decoration:none;margin-right:8px}} .p{{background:#0f9d90;color:#fff}} .g{{background:#ecf7f5;color:#0a7f74}}
-.grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:18px}}
-.panel{{border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff}} .panel-h{{display:flex;justify-content:space-between;align-items:center}} .panel a{{color:#16507c;text-decoration:none}}
+.raw{{margin-top:16px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px;overflow:auto}}
+.raw img{{max-width:100%;height:auto}} .raw table{{max-width:100%;display:block;overflow:auto}}
 .side{{display:grid;gap:14px}} .ad{{background:linear-gradient(120deg,#eef4fb,#f8fbff);border:1px dashed #b9ccde;border-radius:10px;padding:14px;text-align:center;color:#6b85a0;font-size:13px}}
 @media(max-width:980px){{.wrap{{grid-template-columns:1fr}}}}
 </style></head><body>
-<header class="top"><div class="inner"><div class="logo">InspireHub AI频道</div><div class="date">2026-03-01</div></div></header>
-<main class="wrap"><article class="main"><div class="head">{f'<img src="{html.escape(icon_on_detail)}" alt="logo" />' if icon_on_detail else ''}<h1>{html.escape(item['title'])}</h1></div><p class="meta">分类：{html.escape(item['category'])}</p><div class="ad">广告位 A（介绍页顶部横幅）</div><p class="desc">{html.escape(intro)}</p><div class="btns"><a class="p" href="{html.escape(item['url'])}" target="_blank" rel="noopener noreferrer">官网链接</a><a class="g" href="../index.html">返回导航</a></div><div class="grid">{''.join(sections_html)}</div></article>
-<aside class="side"><div class="ad">广告位 B（右侧通栏）</div><div class="ad">广告位 C（右侧补充）</div></aside></main></body></html>"""
-        (pages_dir / detail_name).write_text(detail_html, encoding="utf-8")
+{top_nav_html()}
+<main class=\"wrap\"><article class=\"main\"><div class=\"head\">{f'<img src="{html.escape(icon_on_detail)}" alt="logo" />' if icon_on_detail else ''}<h1>{html.escape(item['title'])}</h1></div><p class=\"meta\">分类：{html.escape(item['category'])}</p><p class=\"desc\">{html.escape(intro)}</p><div class=\"btns\"><a class=\"p\" href=\"{html.escape(item['url'])}\" target=\"_blank\" rel=\"noopener noreferrer\">官网链接</a><a class=\"g\" href=\"../index.html\">返回导航</a></div><section class=\"raw\">{detail_html if detail_html else '<p>未抓取到详情正文。</p>'}</section></article>
+<aside class=\"side\"><div class=\"ad\">广告位 A</div><div class=\"ad\">广告位 B</div></aside></main></body></html>"""
+        (pages_dir / detail_name).write_text(page, encoding="utf-8")
 
 
 def render(imported):
@@ -435,16 +323,15 @@ def main():
     if START not in text or END not in text:
         raise RuntimeError(f"index.html must include markers: {START} ... {END}")
 
-    imported = scrape(timeout=args.timeout)
+    imported = scrape_homepage_only(timeout=args.timeout)
     download_icons(imported, project_root=project_root, icons_dir=project_root / args.icons_dir, timeout=args.timeout)
-    generate_detail_and_articles(imported, project_root=project_root, pages_dir=project_root / args.pages_dir, timeout=args.timeout)
+    generate_detail_pages(imported, project_root=project_root, pages_dir=project_root / args.pages_dir, timeout=args.timeout)
 
     block = render(imported)
     html_path.write_text(re.sub(f"{re.escape(START)}[\\s\\S]*?{re.escape(END)}", f"{START}\n{block}\n{END}", text), encoding="utf-8")
 
-    print(f"Imported {len(imported)} links into {html_path}")
-    print(f"Generated site pages under: {project_root / args.pages_dir}")
-    print(f"Generated article pages under: {project_root / 'articles'}")
+    print(f"Imported {len(imported)} homepage links into {html_path}")
+    print(f"Generated detail pages under: {project_root / args.pages_dir}")
     print(f"Downloaded local icons under: {project_root / args.icons_dir}")
 
 

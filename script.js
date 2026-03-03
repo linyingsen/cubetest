@@ -60,6 +60,18 @@ function applyFilter(keyword = "") {
   emptyState.hidden = totalVisibleCards !== 0;
 }
 
+function showOnlyCategory(targetId) {
+  const blocks = getCategoryBlocks();
+  blocks.forEach((block) => {
+    const isTarget = block.id === targetId;
+    block.hidden = !isTarget;
+    block.querySelectorAll(".site-card").forEach((card) => {
+      card.hidden = !isTarget ? true : false;
+    });
+  });
+  emptyState.hidden = true;
+}
+
 function bindQuickLinks() {
   quickLinks.querySelectorAll("a[data-keyword]").forEach((link) => {
     link.addEventListener("click", (event) => {
@@ -83,6 +95,9 @@ function renderSidebar() {
     if (index === 0) btn.classList.add("active");
 
     btn.addEventListener("click", () => {
+      // 按需求：点击左侧分类时，清空搜索并按分类显示
+      searchInput.value = "";
+      showOnlyCategory(block.id);
       document.getElementById(block.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
       categorySidebar.querySelectorAll("button").forEach((item) => item.classList.toggle("active", item === btn));
     });
