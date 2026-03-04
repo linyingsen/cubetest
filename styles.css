@@ -224,6 +224,9 @@ body {
 .category-sidebar button {
   width: 100%;
   text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   border: 0;
   background: transparent;
   color: var(--ink-soft);
@@ -232,6 +235,20 @@ body {
   margin: 2px 0;
   cursor: pointer;
   transition: all 0.2s;
+}
+
+.category-sidebar__icon {
+  width: 22px;
+  min-width: 22px;
+  text-align: center;
+  font-size: 16px;
+  opacity: 0.9;
+}
+
+.category-sidebar__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .category-sidebar button:hover,

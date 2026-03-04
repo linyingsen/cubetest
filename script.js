@@ -83,6 +83,23 @@ function bindQuickLinks() {
   });
 }
 
+function getCategoryIcon(title = "") {
+  const t = title.toLowerCase();
+  if (t.includes("写作")) return "✍️";
+  if (t.includes("绘图") || t.includes("设计")) return "🎨";
+  if (t.includes("视频")) return "🎬";
+  if (t.includes("办公") || t.includes("效率")) return "📁";
+  if (t.includes("智能体") || t.includes("模型")) return "🧠";
+  if (t.includes("聊天") || t.includes("对话")) return "💬";
+  if (t.includes("编程") || t.includes("开发")) return "</>";
+  if (t.includes("音频")) return "🎵";
+  if (t.includes("搜索")) return "🔍";
+  if (t.includes("学习")) return "🎓";
+  if (t.includes("训练")) return "🧩";
+  if (t.includes("评测")) return "👑";
+  return "✨";
+}
+
 function renderSidebar() {
   categorySidebar.innerHTML = "";
 
@@ -91,7 +108,16 @@ function renderSidebar() {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.dataset.target = block.id;
-    btn.textContent = title;
+    const icon = document.createElement("span");
+    icon.className = "category-sidebar__icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = getCategoryIcon(title);
+
+    const label = document.createElement("span");
+    label.className = "category-sidebar__label";
+    label.textContent = title;
+
+    btn.append(icon, label);
     if (index === 0) btn.classList.add("active");
 
     btn.addEventListener("click", () => {
