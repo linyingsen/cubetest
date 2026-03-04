@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>灵感导航站 · AI工具与数字资源</title>
+  <meta name="description" content="AI 工具与数字资源导航站，收录对话模型、绘图设计、开发效率和学习平台网址。" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <nav class="site-top-nav" aria-label="主导航">
+    <div class="container site-top-nav__inner">
+      <a class="site-brand" href="https://www.wenai123.com" target="_blank" rel="noopener noreferrer" aria-label="问AI123 首页">
+        <img class="site-brand__logo" src="assets/wenai123-logo.svg" alt="问AI123 Logo" />
+        <span class="site-brand__text-group">
+          <span class="site-brand__title">问AI123</span>
+          <span class="site-brand__domain">www.wenai123.com</span>
+        </span>
+      </a>
+      <div class="site-top-nav__links">
+        <a href="#">首页</a>
+        <a href="#">AI工具</a>
+        <a href="#">AI应用</a>
+        <a href="#">每日AI资讯</a>
+        <a href="#">最新项目</a>
+        <a href="#">AI教程</a>
+        <a href="#">关于我们</a>
+      </div>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div class="hero__overlay"></div>
+    <div class="hero__content container">
+      <p class="eyebrow">InspireHub</p>
+      <h1>AI 与效率工具导航</h1>
+      <p class="hero__desc">精选 AI 模型、设计工具、开发资源与学习平台，帮助你快速找到高价值站点。</p>
+      <div class="search-box">
+        <input id="searchInput" type="text" placeholder="搜索工具名称、分类、关键词…" aria-label="搜索网址" />
+      </div>
+      <nav class="quick-links" id="quickLinks">
+        <a href="#" data-keyword="AI">热门工具</a>
+        <a href="#" data-keyword="绘图">绘图设计</a>
+        <a href="#" data-keyword="开发">开发提效</a>
+        <a href="#" data-keyword="学习">学习资源</a>
+        <a href="#" data-keyword="中文">中文友好</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container main-layout">
+    <aside class="category-sidebar" id="categorySidebar"></aside>
+
+    <section class="cards-area" id="cardsArea">
+      <section class="category-block" id="chat-models" data-category="AI 对话与大模型">
+        <div class="category-head">
+          <h2>AI 对话与大模型</h2>
+          <span class="category-tag">热门</span>
+        </div>
+        <div class="card-grid">
+          <a class="site-card" href="https://chat.openai.com/" target="_blank" rel="noopener noreferrer" data-keywords="ChatGPT 对话模型 AI 写作 编程">
+            <h3 class="site-title">ChatGPT</h3>
+            <p class="site-desc">多用途 AI 助手，适合写作、编程与头脑风暴。</p>
+            <span class="site-meta">对话模型</span>
+          </a>
+          <a class="site-card" href="https://claude.ai/" target="_blank" rel="noopener noreferrer" data-keywords="Claude 对话模型 文档理解">
+            <h3 class="site-title">Claude</h3>
+            <p class="site-desc">长上下文与文档理解能力强，适合分析整理。</p>
+            <span class="site-meta">对话模型</span>
+          </a>
+          <a class="site-card" href="https://gemini.google.com/" target="_blank" rel="noopener noreferrer" data-keywords="Gemini 对话模型 多模态">
+            <h3 class="site-title">Gemini</h3>
+            <p class="site-desc">Google 系 AI 助手，支持多模态交互。</p>
+            <span class="site-meta">对话模型</span>
+          </a>
+          <a class="site-card" href="https://kimi.moonshot.cn/" target="_blank" rel="noopener noreferrer" data-keywords="Kimi 中文 AI 长文阅读">
+            <h3 class="site-title">Kimi</h3>
+            <p class="site-desc">擅长阅读长文与中文场景问答。</p>
+            <span class="site-meta">中文 AI</span>
+          </a>
+          <a class="site-card" href="https://tongyi.aliyun.com/" target="_blank" rel="noopener noreferrer" data-keywords="通义千问 中文 AI 阿里云">
+            <h3 class="site-title">通义千问</h3>
+            <p class="site-desc">阿里云推出的中文 AI 助手与模型平台。</p>
+            <span class="site-meta">中文 AI</span>
+          </a>
+          <a class="site-card" href="https://yiyan.baidu.com/" target="_blank" rel="noopener noreferrer" data-keywords="文心一言 中文 AI 百度">
+            <h3 class="site-title">文心一言</h3>
+            <p class="site-desc">百度大模型应用，适合中文内容创作。</p>
+            <span class="site-meta">中文 AI</span>
+          </a>
+        </div>
+      </section>
+
+      <section class="category-block" id="image-design" data-category="AI 绘图与设计">
+        <div class="category-head">
+          <h2>AI 绘图与设计</h2>
+          <span class="category-tag">创意</span>
+        </div>
+        <div class="card-grid">
+          <a class="site-card" href="https://www.midjourney.com/" target="_blank" rel="noopener noreferrer" data-keywords="Midjourney AI 绘图">
+            <h3 class="site-title">Midjourney</h3>
+            <p class="site-desc">高质量 AI 图像生成，风格表达丰富。</p>
+            <span class="site-meta">AI 绘图</span>
+          </a>
+          <a class="site-card" href="https://stability.ai/" target="_blank" rel="noopener noreferrer" data-keywords="Stable Diffusion 开源 AI 绘图">
+            <h3 class="site-title">Stable Diffusion</h3>
+            <p class="site-desc">开源生态强，可私有化部署与精细控制。</p>
+            <span class="site-meta">开源</span>
+          </a>
+          <a class="site-card" href="https://firefly.adobe.com/" target="_blank" rel="noopener noreferrer" data-keywords="Adobe Firefly 设计 生成式">
+            <h3 class="site-title">Adobe Firefly</h3>
+            <p class="site-desc">Adobe 生态中的生成式设计工具。</p>
+            <span class="site-meta">设计</span>
+          </a>
+          <a class="site-card" href="https://www.canva.com/" target="_blank" rel="noopener noreferrer" data-keywords="Canva 视觉设计 模板">
+            <h3 class="site-title">Canva</h3>
+            <p class="site-desc">在线图形设计平台，模板丰富上手快。</p>
+            <span class="site-meta">视觉设计</span>
+          </a>
+        </div>
+      </section>
+
+      <section class="category-block" id="dev-tools" data-category="开发者效率工具">
+        <div class="category-head">
+          <h2>开发者效率工具</h2>
+          <span class="category-tag">开发</span>
+        </div>
+        <div class="card-grid">
+          <a class="site-card" href="https://github.com/" target="_blank" rel="noopener noreferrer" data-keywords="GitHub 代码协作 开发">
+            <h3 class="site-title">GitHub</h3>
+            <p class="site-desc">代码托管与开源协作核心平台。</p>
+            <span class="site-meta">代码协作</span>
+          </a>
+          <a class="site-card" href="https://vercel.com/" target="_blank" rel="noopener noreferrer" data-keywords="Vercel 部署 前端">
+            <h3 class="site-title">Vercel</h3>
+            <p class="site-desc">前端部署平台，适合快速发布静态与全栈应用。</p>
+            <span class="site-meta">部署</span>
+          </a>
+          <a class="site-card" href="https://www.cloudflare.com/" target="_blank" rel="noopener noreferrer" data-keywords="Cloudflare CDN 安全 基础设施">
+            <h3 class="site-title">Cloudflare</h3>
+            <p class="site-desc">CDN、安全与边缘计算服务。</p>
+            <span class="site-meta">基础设施</span>
+          </a>
+          <a class="site-card" href="https://stackoverflow.com/" target="_blank" rel="noopener noreferrer" data-keywords="Stack Overflow 知识库 问答">
+            <h3 class="site-title">Stack Overflow</h3>
+            <p class="site-desc">程序员问答社区，问题覆盖面广。</p>
+            <span class="site-meta">知识库</span>
+          </a>
+        </div>
+      </section>
+
+      <section class="category-block" id="learn" data-category="学习与成长">
+        <div class="category-head">
+          <h2>学习与成长</h2>
+          <span class="category-tag">学习</span>
+        </div>
+        <div class="card-grid">
+          <a class="site-card" href="https://www.coursera.org/" target="_blank" rel="noopener noreferrer" data-keywords="Coursera 课程 学习">
+            <h3 class="site-title">Coursera</h3>
+            <p class="site-desc">全球高校课程，涵盖 AI、编程与商业。</p>
+            <span class="site-meta">课程</span>
+          </a>
+          <a class="site-card" href="https://www.deeplearning.ai/" target="_blank" rel="noopener noreferrer" data-keywords="DeepLearning.AI AI 学习">
+            <h3 class="site-title">DeepLearning.AI</h3>
+            <p class="site-desc">AI 专项课程与实践资源。</p>
+            <span class="site-meta">AI 学习</span>
+          </a>
+          <a class="site-card" href="https://www.freecodecamp.org/" target="_blank" rel="noopener noreferrer" data-keywords="freeCodeCamp 编程 学习">
+            <h3 class="site-title">freeCodeCamp</h3>
+            <p class="site-desc">免费编程学习路径与项目实践。</p>
+            <span class="site-meta">编程</span>
+          </a>
+          <a class="site-card" href="https://www.icourse163.org/" target="_blank" rel="noopener noreferrer" data-keywords="中国大学MOOC 中文 课程">
+            <h3 class="site-title">中国大学MOOC</h3>
+            <p class="site-desc">中文高校公开课程平台。</p>
+            <span class="site-meta">中文课程</span>
+          </a>
+        </div>
+      </section>
+
+      <!-- AI_BOT_IMPORT_START -->
+      <section class="category-block" id="aibot-import-placeholder" data-category="AI-BOT导入区">
+        <div class="category-head">
+          <h2>AI-BOT 首页导入区（待同步）</h2>
+          <span class="category-tag">工具脚本</span>
+        </div>
+        <div class="card-grid">
+          <article class="site-card">
+            <h3 class="site-title">尚未导入</h3>
+            <p class="site-desc">运行 <code>python3 tools/import_aibot.py --output index.html</code> 后，将自动把首页分类和网址写入这里。</p>
+            <span class="site-meta">自动化导入</span>
+          </article>
+        </div>
+      </section>
+      <!-- AI_BOT_IMPORT_END -->
+
+      <div class="empty-state" id="emptyState" hidden>未找到匹配内容，请尝试更换关键词。</div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>© 2026 InspireHub · 原生 JS + CSS 构建 · 内容仅供学习与个人导航整理使用</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
