@@ -100,35 +100,133 @@ function getCategoryIcon(title = "") {
   return "✨";
 }
 
+function parseCategoryParts(title = "") {
+  const raw = (title || "").trim();
+  const parts = raw.split("/").map((item) => item.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    return { first: parts[0], second: parts.slice(1).join(" / ") };
+  }
+  return { first: raw, second: "" };
+}
+
 function renderSidebar() {
   categorySidebar.innerHTML = "";
 
+  const groups = [];
+  const groupMap = new Map();
+
   getCategoryBlocks().forEach((block, index) => {
     const title = block.dataset.category || block.querySelector("h2")?.textContent || `分类${index + 1}`;
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.dataset.target = block.id;
+    const { first, second } = parseCategoryParts(title);
+    if (!groupMap.has(first)) {
+      const group = { first, parentBlock: null, children: [] };
+      groupMap.set(first, group);
+      groups.push(group);
+    }
+    const g = groupMap.get(first);
+    if (second) {
+      g.children.push({ second, block });
+    } else {
+      g.parentBlock = block;
+    }
+  });
+
+  function setActive(targetBtn) {
+    categorySidebar.querySelectorAll("button").forEach((item) => item.classList.toggle("active", item === targetBtn));
+  }
+
+  groups.forEach((group, index) => {
+    if (group.children.length === 0) {
+      const title = group.first;
+      const block = group.parentBlock;
+      if (!block) return;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.dataset.target = block.id;
+
+      const icon = document.createElement("span");
+      icon.className = "category-sidebar__icon";
+      icon.setAttribute("aria-hidden", "true");
+      icon.textContent = getCategoryIcon(title);
+
+      const label = document.createElement("span");
+      label.className = "category-sidebar__label";
+      label.textContent = title;
+
+      btn.append(icon, label);
+      if (index === 0) btn.classList.add("active");
+
+      btn.addEventListener("click", () => {
+        searchInput.value = "";
+        showOnlyCategory(block.id);
+        document.getElementById(block.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+        setActive(btn);
+      });
+      categorySidebar.appendChild(btn);
+      return;
+    }
+
+    const wrap = document.createElement("div");
+    wrap.className = "category-sidebar__group";
+
+    const parentBtn = document.createElement("button");
+    parentBtn.type = "button";
+    parentBtn.className = "category-sidebar__parent";
+    parentBtn.setAttribute("aria-expanded", "false");
+
     const icon = document.createElement("span");
     icon.className = "category-sidebar__icon";
     icon.setAttribute("aria-hidden", "true");
-    icon.textContent = getCategoryIcon(title);
+    icon.textContent = getCategoryIcon(group.first);
 
     const label = document.createElement("span");
     label.className = "category-sidebar__label";
-    label.textContent = title;
+    label.textContent = group.first;
 
-    btn.append(icon, label);
-    if (index === 0) btn.classList.add("active");
+    const caret = document.createElement("span");
+    caret.className = "category-sidebar__caret";
+    caret.setAttribute("aria-hidden", "true");
+    caret.textContent = "⌄";
 
-    btn.addEventListener("click", () => {
-      // 按需求：点击左侧分类时，清空搜索并按分类显示
-      searchInput.value = "";
-      showOnlyCategory(block.id);
-      document.getElementById(block.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-      categorySidebar.querySelectorAll("button").forEach((item) => item.classList.toggle("active", item === btn));
+    parentBtn.append(icon, label, caret);
+
+    const subList = document.createElement("div");
+    subList.className = "category-sidebar__sublist";
+    subList.hidden = true;
+
+    group.children.forEach((item, childIndex) => {
+      const childBtn = document.createElement("button");
+      childBtn.type = "button";
+      childBtn.className = "category-sidebar__child";
+      childBtn.dataset.target = item.block.id;
+      childBtn.textContent = item.second;
+
+      childBtn.addEventListener("click", () => {
+        searchInput.value = "";
+        showOnlyCategory(item.block.id);
+        document.getElementById(item.block.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+        setActive(childBtn);
+      });
+
+      if (index === 0 && childIndex === 0) {
+        childBtn.classList.add("active");
+        subList.hidden = false;
+        wrap.classList.add("is-open");
+        parentBtn.setAttribute("aria-expanded", "true");
+      }
+
+      subList.appendChild(childBtn);
     });
 
-    categorySidebar.appendChild(btn);
+    parentBtn.addEventListener("click", () => {
+      const opening = subList.hidden;
+      subList.hidden = !opening;
+      wrap.classList.toggle("is-open", opening);
+      parentBtn.setAttribute("aria-expanded", opening ? "true" : "false");
+    });
+
+    wrap.append(parentBtn, subList);
+    categorySidebar.appendChild(wrap);
   });
 }
 

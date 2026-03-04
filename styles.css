@@ -237,6 +237,50 @@ body {
   transition: all 0.2s;
 }
 
+.category-sidebar__parent {
+  justify-content: space-between;
+}
+
+.category-sidebar__parent .category-sidebar__label {
+  flex: 1;
+}
+
+.category-sidebar__caret {
+  font-size: 14px;
+  opacity: 0.8;
+  transition: transform 0.2s ease;
+}
+
+.category-sidebar__group.is-open .category-sidebar__caret {
+  transform: rotate(180deg);
+}
+
+.category-sidebar__sublist {
+  display: grid;
+  gap: 4px;
+  margin: 2px 0 8px;
+  padding-left: 28px;
+}
+
+.category-sidebar__child {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-soft);
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.category-sidebar__child:hover,
+.category-sidebar__child.active {
+  background: #e9f8f6;
+  color: var(--brand-strong);
+  font-weight: 600;
+}
+
 .category-sidebar__icon {
   width: 22px;
   min-width: 22px;
